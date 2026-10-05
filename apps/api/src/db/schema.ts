@@ -1,4 +1,4 @@
-import { mysqlTable, varchar, text, boolean, timestamp, index, uniqueIndex, primaryKey, foreignKey, mysqlEnum } from 'drizzle-orm/mysql-core';
+import { mysqlTable, varchar, text, boolean, timestamp, index, uniqueIndex, primaryKey, foreignKey, mysqlEnum, json } from 'drizzle-orm/mysql-core';
 const id = (name: string) => varchar(name, { length: 36 });
 const dates = () => ({ createdAt: timestamp('created_at', { fsp: 3 }).notNull().defaultNow(), updatedAt: timestamp('updated_at', { fsp: 3 }).notNull().defaultNow().$onUpdate(() => new Date()) });
 export const user = mysqlTable('auth_user', {
@@ -33,3 +33,30 @@ export const branchAccess = mysqlTable('branch_access', {
 export const member = mysqlTable('member', {
  id: id('id').primaryKey(), gymId: id('gym_id').notNull(), userId: id('user_id').notNull(), ...dates(),
 }, t => [uniqueIndex('member_gym_user').on(t.gymId, t.userId), foreignKey({ columns: [t.gymId, t.userId], foreignColumns: [gymUser.gymId, gymUser.userId] })]);
+
+// Receipt and events are written in the SAME transaction as the domain mutation.
+export const commandReceipt = mysqlTable('command_receipt', {
+ scopeHash: varchar('scope_hash', { length: 64 }).primaryKey(),
+ commandId: id('command_id').notNull().unique(),
+ gymId: id('gym_id').notNull().references(() => gym.id),
+ actorId: id('actor_id').notNull().references(() => user.id),
+ branchId: id('branch_id').notNull(),
+ operation: varchar('operation', { length: 100 }).notNull(),
+ requestHash: varchar('request_hash', { length: 64 }).notNull(),
+ status: mysqlEnum('status', ['pending', 'completed']).notNull(),
+ result: json('result').$type<import('../commands.js').JsonValue>(),
+ ...dates(),
+}, t => [foreignKey({ columns: [t.gymId, t.branchId], foreignColumns: [branch.gymId, branch.id] }), index('receipt_gym_created').on(t.gymId, t.createdAt)]);
+export const auditEvent = mysqlTable('audit_event', {
+ id: id('id').primaryKey(), commandId: id('command_id').notNull().unique().references(() => commandReceipt.commandId),
+ gymId: id('gym_id').notNull().references(() => gym.id), actorId: id('actor_id').notNull().references(() => user.id),
+ operation: varchar('operation', { length: 100 }).notNull(), resourceId: varchar('resource_id', { length: 100 }).notNull(),
+ createdAt: timestamp('created_at', { fsp: 3 }).notNull().defaultNow(),
+}, t => [index('audit_gym_created').on(t.gymId, t.createdAt)]);
+export const outboxEvent = mysqlTable('outbox_event', {
+ id: id('id').primaryKey(), commandId: id('command_id').notNull().references(() => commandReceipt.commandId),
+ gymId: id('gym_id').notNull().references(() => gym.id),
+ eventType: varchar('event_type', { length: 100 }).notNull(), resourceId: varchar('resource_id', { length: 100 }).notNull(),
+ createdAt: timestamp('created_at', { fsp: 3 }).notNull().defaultNow(),
+ publishedAt: timestamp('published_at', { fsp: 3 }),
+}, t => [uniqueIndex('outbox_command_type').on(t.commandId, t.eventType), index('outbox_pending').on(t.publishedAt, t.createdAt)]);

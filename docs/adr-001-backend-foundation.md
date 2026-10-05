@@ -14,7 +14,7 @@ Auth endpoints retain Better Auth's native response/error format; business endpo
 
 Pending D01: hosting vendor, domain, proxy topology, browser support and load-test capacity. Rate limiting currently uses process memory; multiple API replicas require shared rate limiting or an ingress-level policy. Do not blindly trust client-supplied forwarding headers.
 
-Pending Sprint 0 work: transaction/locking spike, audited idempotency receipts/outbox, benefit evaluator, frontend integration, offline spike, CI evidence, staging deployment and G0 review. This PR does not complete G0.
+The second Sprint 0 slice implements the benefit policy module and transactional receipt/audit/outbox foundation with a locking spike. See command-and-benefit-foundation.md for limits. Pending: production membership integration, outbox dispatch, frontend integration, offline spike, staging deployment and G0 review. This PR does not complete G0.
 
 References checked during implementation:
 - https://better-auth.com/docs/integrations/express

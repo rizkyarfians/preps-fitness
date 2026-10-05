@@ -34,8 +34,12 @@ Integration tests require `NODE_ENV=test`, the same required environment variabl
 
 GitHub Actions provides MySQL 8.4 and runs dependency install, typecheck, build, unit/API tests, migration drift checks, migrations twice, and integration tests. Production startup never automatically migrates a database.
 
+## Additional Sprint 0 foundation
+
+A fail-closed benefit evaluator and transactional command runner are included. The runner commits domain writes, receipt, audit and outbox together. MySQL tests exercise concurrent retries, rollback and two-admin locking. See `docs/command-and-benefit-foundation.md`. The evaluator is not yet connected to production membership facts; outbox delivery is not yet implemented.
+
 ## Scope and remaining work
 
-This is the first Sprint 0 slice, not a production-ready product. Membership, payment, benefit evaluation, audit/outbox, email recovery, production user provisioning and frontend are pending. Hosting, CI/staging verification, transaction spike and G0 acceptance remain open. No staging or production deployment is configured.
+This is the first Sprint 0 slice, not a production-ready product. Membership, payment, production benefit wiring, outbox dispatch, email recovery, production user provisioning and frontend are pending. Hosting, staging verification, load testing and G0 acceptance remain open. No staging or production deployment is configured.
 
 Read `docs/adr-001-backend-foundation.md` for decisions and limitations.
