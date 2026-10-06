@@ -7,7 +7,22 @@ async function login(page: Page) {
   await page.goto('/');
   await page.getByLabel('Email', { exact: true }).fill('admin@example.test');
   await page.getByLabel('Kata sandi', { exact: true }).fill(process.env.SEED_PASSWORD!);
-  await page.getByRole('button', { name: 'Masuk ke akun' }).click();
+  const submit = async () => {
+    const response = page.waitForResponse(r => r.url() === `${api}/auth/sign-in/email` && r.request().method() === 'POST');
+    await page.getByRole('button', { name: 'Masuk ke akun' }).click();
+    return response;
+  };
+  let response = await submit();
+  if (response.status() === 429) {
+    // Keep the real auth limiter enabled. Honor its bounded retry window.
+    await expect(page.getByRole('alert')).toContainText('Terlalu banyak percobaan');
+    const seconds = Number(response.headers()['x-retry-after']);
+    expect(Number.isFinite(seconds) && seconds > 0 && seconds <= 10).toBe(true);
+    console.log('Login rate limit observed; honoring X-Retry-After');
+    await new Promise(resolve => setTimeout(resolve, seconds * 1000 + 100));
+    response = await submit();
+  }
+  expect(response.status(), 'Real login must succeed before testing the session').toBe(200);
   await expect(page.getByText('AKUN TERHUBUNG', { exact: true })).toBeVisible();
 }
 async function focusAndWait(page: Page, status: number) {
