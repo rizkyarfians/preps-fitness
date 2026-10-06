@@ -1,0 +1,45 @@
+name: Backend foundation
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root-only
+          MYSQL_DATABASE: preps_test
+          MYSQL_USER: preps
+          MYSQL_PASSWORD: ci-test-only
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -pci-root-only"
+          --health-interval=10s --health-timeout=5s --health-retries=12
+    env:
+      NODE_ENV: test
+      DATABASE_URL: mysql://preps:ci-test-only@127.0.0.1:3306/preps_test
+      GYM_ID: gym-test
+      BETTER_AUTH_SECRET: ci-only-not-a-production-secret-0123456789
+      BETTER_AUTH_URL: http://localhost:3000
+      WEB_ORIGIN: http://localhost:5173
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+      - run: npm run db:generate
+      - run: git diff --exit-code -- db/migrations
+      - run: test -z "$(git ls-files --others --exclude-standard db/migrations)"
+      - run: npm run db:migrate
+      - run: npm run db:migrate
+      - run: npm run test:integration
