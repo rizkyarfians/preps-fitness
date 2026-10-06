@@ -1,0 +1,30 @@
+{
+  "name": "@preps/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "npm run contracts:check && tsc --noEmit && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "contracts": "node scripts/contracts.mjs",
+    "contracts:check": "node scripts/contracts.mjs --check",
+    "test": "playwright test"
+  },
+  "dependencies": {
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "better-auth": "1.7.7",
+    "lucide-react": "0.468.0",
+    "@fontsource/barlow-condensed": "5.2.6",
+    "@fontsource/inter": "5.2.6"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2",
+    "vite": "6.1.0",
+    "@vitejs/plugin-react": "4.3.4",
+    "@types/react": "19.1.10",
+    "@types/react-dom": "19.1.9",
+    "@playwright/test": "1.56.1"
+  }
+}
