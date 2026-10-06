@@ -27,9 +27,16 @@ export function createApp(d: AppDeps) {
   if (!p.enabled || p.gymId !== d.gymId) { fail(res, 403, 'ACCOUNT_ACCESS_DENIED'); return; }
   res.locals.principal = p; next();
  });
- app.get('/api/v1/me', (_req, res) => {
+ app.get('/api/v1/me', async (_req, res) => {
   const p = res.locals.principal as Principal;
-  res.json({ data: { user: p.user, gymId: d.gymId, branchAccess: p.grants.filter(g => g.gymId === d.gymId).map(({ branchId, role }) => ({ branchId, role })), entitlements: [] } });
+  // Resolve names only after deployment and account authorization.
+  const grants = p.grants.filter(g => g.gymId === d.gymId);
+  const branches = new Map(await Promise.all([...new Set(grants.map(g => g.branchId))].map(async id => [id, await d.getBranch(id)] as const)));
+  const branchAccess = grants.flatMap(({ branchId, role }) => {
+   const branch = branches.get(branchId);
+   return branch ? [{ branchId, branchName: branch.name, role }] : [];
+  });
+  res.json({ data: { user: p.user, gymId: d.gymId, branchAccess, entitlements: [] } });
  });
  app.get('/api/v1/branches/:branchId', async (req, res) => {
   if (!allowedBranch(res.locals.principal as Principal, d.gymId, req.params.branchId)) { fail(res, 403, 'BRANCH_ACCESS_DENIED'); return; }

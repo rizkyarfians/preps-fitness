@@ -99,13 +99,17 @@ function App() {
   const [busy, setBusy] = useState(false),
     [notice, setNotice] = useState("");
   const generation = useRef(0);
+  const signingOut = useRef(false);
+  const [checkingSession, setCheckingSession] = useState(false);
   const reset = () => {
     setMe(null);
     setBranchId("");
   };
-  async function refresh() {
+  async function refresh(background = false) {
     const ticket = ++generation.current;
-    setLoading(true);
+    if (signingOut.current) return;
+    if (!background) setLoading(true);
+    setCheckingSession(background);
     setError(null);
     try {
       const user = await getMe();
@@ -118,16 +122,23 @@ function App() {
       );
     } catch (e) {
       if (ticket !== generation.current) return;
-      reset();
-      if (!(e instanceof ApiError && e.status === 401)) setError(e);
+      const denied =
+        e instanceof ApiError && (e.status === 401 || e.status === 403);
+      if (!background || denied) reset();
+      if (e instanceof ApiError && e.status === 401)
+        setNotice("Sesi berakhir. Silakan masuk kembali.");
+      else setError(e);
     } finally {
-      if (ticket === generation.current) setLoading(false);
+      if (ticket === generation.current) {
+        setLoading(false);
+        setCheckingSession(false);
+      }
     }
   }
   useEffect(() => {
     void refresh();
     const onFocus = () => {
-      void refresh();
+      void refresh(true);
     };
     window.addEventListener("focus", onFocus);
     return () => {
@@ -136,6 +147,8 @@ function App() {
     };
   }, []);
   async function logout() {
+    signingOut.current = true;
+    setCheckingSession(false);
     setBusy(true);
     setError(null);
     generation.current++;
@@ -151,6 +164,7 @@ function App() {
         "Logout belum terkonfirmasi. Coba keluar lagi untuk mengakhiri sesi di server.",
       );
     } finally {
+      signingOut.current = false;
       setBusy(false);
     }
   }
@@ -183,13 +197,16 @@ function App() {
     );
   return (
     <Shell
-      key={me.user.id}
+      key={`${me.gymId}:${me.user.id}`}
       me={me}
       branchId={branchId}
       selectBranch={setBranchId}
       logout={logout}
       busy={busy}
       onSessionError={sessionError}
+      checkingSession={checkingSession}
+      sessionWarning={error}
+      retrySession={() => void refresh(true)}
     />
   );
 }
@@ -339,6 +356,9 @@ function Shell({
   logout,
   busy,
   onSessionError,
+  checkingSession,
+  sessionWarning,
+  retrySession,
 }: {
   me: Me;
   branchId: string;
@@ -346,6 +366,9 @@ function Shell({
   logout: () => Promise<void>;
   busy: boolean;
   onSessionError: (e: unknown) => void;
+  checkingSession: boolean;
+  sessionWarning: unknown;
+  retrySession: () => void;
 }) {
   const [branch, setBranch] = useState<{ id: string; name: string } | null>(
       null,
@@ -487,7 +510,8 @@ function Shell({
               {[...new Set(me.branchAccess.map((b) => b.branchId))].map(
                 (id) => (
                   <option key={id} value={id}>
-                    {branch?.id === id ? branch.name : id}
+                    {me.branchAccess.find((access) => access.branchId === id)
+                      ?.branchName || "Nama cabang tidak tersedia"}
                   </option>
                 ),
               )}
@@ -496,6 +520,19 @@ function Shell({
           </div>
         </header>
         <main id="main">
+          {checkingSession && (
+            <p className="muted" role="status">
+              Memeriksa sesi…
+            </p>
+          )}
+          {!!sessionWarning && (
+            <div>
+              <Message error={sessionWarning} />
+              <button className="secondary" onClick={retrySession}>
+                Periksa sesi lagi
+              </button>
+            </div>
+          )}
           <div className="page-heading">
             <div>
               <p className="eyebrow">

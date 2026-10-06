@@ -18,7 +18,7 @@ Start the API and MySQL using the root README. Seed an account using the backend
 
 Implemented: login, server logout, `/me`, branch switching, branch-scoped role navigation, loading/error/denied states, responsive login and workspace shell. No tokens or personal data are persisted in browser storage. Focus revalidates the session; branch requests are cancelled on branch changes. Logout clears the private view immediately but only claims success after the server responds.
 
-Membership, payments, exercise content, programs and reports have explicitly unavailable screens. There are no fake metrics, live-looking fixtures or working business mutations. Empty entitlements grant no benefits. Navigation is presentation only; the API remains the authorization boundary. Current branch labels resolve on selection because the API exposes no branch listing with names.
+Membership, payments, exercise content, programs and reports have explicitly unavailable screens. There are no fake metrics, live-looking fixtures or working business mutations. Empty entitlements grant no benefits. Navigation is presentation only; the API remains the authorization boundary. All dropdown labels come from `/me.branchAccess[].branchName`, including branches not yet selected. Deploy the updated backend contract before this frontend. Focus revalidation preserves the mounted workspace on success and temporary network/server failure; 401/403 clears private UI. A background error offers an explicit retry.
 
 This is a frontend foundation, not completion of G0. IndexedDB/offline spike, real database-backed browser integration, staging, production deployment and operational UAT remain outstanding.
 

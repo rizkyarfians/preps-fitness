@@ -1,0 +1,50 @@
+name: Real browser integration
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  browser-mysql:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root-only
+          MYSQL_DATABASE: preps_e2e
+          MYSQL_USER: preps
+          MYSQL_PASSWORD: ci-test-only
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -pci-root-only"
+          --health-interval=10s --health-timeout=5s --health-retries=12
+    env:
+      NODE_ENV: test
+      DATABASE_URL: mysql://preps:ci-test-only@127.0.0.1:3306/preps_e2e
+      E2E_DISPOSABLE_DATABASE: 'yes'
+      GYM_ID: gym-e2e
+      BETTER_AUTH_SECRET: ci-only-browser-secret-not-for-production-012345
+      BETTER_AUTH_URL: http://localhost:3000
+      WEB_ORIGIN: http://localhost:5173
+      VITE_API_ORIGIN: http://localhost:3000
+      SEED_PASSWORD: ci-only-browser-password
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            apps/web/package-lock.json
+      - run: npm ci
+      - run: npm ci --prefix apps/web
+      - run: npm run typecheck && npm run build
+      - run: npm run build --prefix apps/web
+      - run: npm run db:migrate && npm run db:seed
+      - run: npx playwright install --with-deps chromium
+        working-directory: apps/web
+      - run: npx playwright test --config playwright.integration.config.ts
+        working-directory: apps/web
