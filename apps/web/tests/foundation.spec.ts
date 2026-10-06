@@ -3,8 +3,8 @@ const user = {
   user: { id: "user-1", name: "Rizky Arfiansyah", email: "rizky@example.test" },
   gymId: "gym-1",
   branchAccess: [
-    { branchId: "central", role: "owner" },
-    { branchId: "east", role: "member" },
+    { branchId: "central", branchName: "PREPS Central", role: "owner" },
+    { branchId: "east", branchName: "PREPS East", role: "member" },
   ],
   entitlements: [],
 };
@@ -184,4 +184,94 @@ test("login visual reference", async ({ page }) => {
     page.getByRole("button", { name: "Masuk ke akun" }),
   ).toBeVisible();
   await page.screenshot({ path: "test-results/login.png", fullPage: true });
+});
+
+test("all branch names are available before selecting another branch", async ({
+  page,
+}) => {
+  await fixture(page);
+  await page.goto("/");
+  await expect(page.getByLabel("Cabang aktif").locator("option")).toHaveText([
+    "PREPS Central",
+    "PREPS East",
+  ]);
+});
+
+test("focus revalidation preserves the page and mounted workspace while pending and after success", async ({
+  page,
+}) => {
+  await fixture(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Membership", exact: true }).click();
+  const heading = page.getByRole("heading", {
+    name: "MEMBERSHIP SEGERA HADIR",
+  });
+  await expect(heading).toBeVisible();
+  await page
+    .locator("#main")
+    .evaluate((el) => el.setAttribute("data-mount-proof", "original"));
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/api/v1/me", async (r) => {
+    await gate;
+    await r.fulfill({ json: { data: user } });
+  });
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(page.getByRole("status")).toHaveText("Memeriksa sesi…");
+  await expect(heading).toBeVisible();
+  release();
+  await expect(page.getByRole("status")).toHaveCount(0);
+  await expect(heading).toBeVisible();
+  await expect(page.locator("#main")).toHaveAttribute(
+    "data-mount-proof",
+    "original",
+  );
+});
+
+test("temporary session check failure preserves workspace and supports retry", async ({
+  page,
+}) => {
+  await fixture(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Membership", exact: true }).click();
+  await page.route("**/api/v1/me", (r) =>
+    r.fulfill({
+      status: 503,
+      json: {
+        error: { reasonCode: "SERVICE_UNAVAILABLE", requestId: "temporary" },
+      },
+    }),
+  );
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "MEMBERSHIP SEGERA HADIR" }),
+  ).toBeVisible();
+  await page.route("**/api/v1/me", (r) => r.fulfill({ json: { data: user } }));
+  await page.getByRole("button", { name: "Periksa sesi lagi" }).click();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "MEMBERSHIP SEGERA HADIR" }),
+  ).toBeVisible();
+});
+
+test("background 403 clears workspace despite preserving it for temporary errors", async ({
+  page,
+}) => {
+  await fixture(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Membership", exact: true }).click();
+  await page.route("**/api/v1/me", (r) =>
+    r.fulfill({
+      status: 403,
+      json: {
+        error: { reasonCode: "ACCOUNT_ACCESS_DENIED", requestId: "denied" },
+      },
+    }),
+  );
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(page.getByRole("alert")).toContainText("Akses tidak tersedia");
+  await expect(page.getByRole("navigation")).toHaveCount(0);
 });

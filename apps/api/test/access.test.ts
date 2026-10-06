@@ -22,5 +22,24 @@ test('branch IDs cannot bypass grants, even with forged gym headers', async () =
 test('/me does not infer paid benefits or expose session tokens', async () => {
  const res = await request(app(principal)).get('/api/v1/me').expect(200);
  assert.deepEqual(res.body.data.entitlements, []); assert.equal(res.body.data.session, undefined);
- assert.deepEqual(res.body.data.branchAccess, [{ branchId: 'branch-a', role: 'member' }]);
+ assert.deepEqual(res.body.data.branchAccess, [{ branchId: 'branch-a', branchName: 'Demo', role: 'member' }]);
+});
+
+test('/me lists all authorized branch names and never looks up foreign grants', async () => {
+ const lookedUp: string[] = [];
+ const p: Principal = { ...principal, grants: [
+  ...principal.grants,
+  { gymId: 'gym-a', branchId: 'branch-b', role: 'admin' },
+  { gymId: 'gym-b', branchId: 'foreign', role: 'owner' },
+  { gymId: 'gym-a', branchId: 'deleted', role: 'member' },
+ ] };
+ const api = createApp({ gymId: 'gym-a', webOrigin: 'http://localhost:5173',
+  authHandler: (_req, res) => { res.sendStatus(404); }, resolvePrincipal: async () => p,
+  getBranch: async id => { lookedUp.push(id); return id === 'deleted' ? null : { id, name: `Name ${id}` }; }, ready: async () => {} });
+ const res = await request(api).get('/api/v1/me').expect(200);
+ assert.deepEqual(res.body.data.branchAccess, [
+  { branchId: 'branch-a', branchName: 'Name branch-a', role: 'member' },
+  { branchId: 'branch-b', branchName: 'Name branch-b', role: 'admin' },
+ ]);
+ assert.deepEqual(lookedUp.sort(), ['branch-a', 'branch-b', 'deleted']);
 });

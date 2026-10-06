@@ -243,11 +243,16 @@
                     "pt",
                     "member"
                   ]
+                },
+                "branchName": {
+                  "type": "string",
+                  "description": "Display name of this authorized branch in the deployment gym."
                 }
               },
               "required": [
                 "branchId",
-                "role"
+                "role",
+                "branchName"
               ]
             }
           },
