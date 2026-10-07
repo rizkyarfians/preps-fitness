@@ -1,6 +1,6 @@
 # Preps Fitness
 
-Backend foundation for Gym Planner. One deployment and MySQL database per gym business, with multiple branches. Built with Node.js, TypeScript, Express, Better Auth and Drizzle.
+Backend and frontend foundation for Gym Planner. One deployment and MySQL database per gym business, with multiple branches. The API uses Node.js, TypeScript, Express, Better Auth and Drizzle; the frontend in `apps/web` uses React, TypeScript and Vite.
 
 ## Local setup
 
@@ -38,8 +38,18 @@ GitHub Actions provides MySQL 8.4 and runs dependency install, typecheck, build,
 
 A fail-closed benefit evaluator and transactional command runner are included. The runner commits domain writes, receipt, audit and outbox together. MySQL tests exercise concurrent retries, rollback and two-admin locking. See `docs/command-and-benefit-foundation.md`. The evaluator is not yet connected to production membership facts; outbox delivery is not yet implemented.
 
+## Frontend foundation
+
+The responsive frontend includes login/logout, authorized branch selection using branch names, and role-aware workspace navigation. Background session refresh preserves the current page; session revalidation returning 401/403 clears private content. Business module screens are not yet implemented.
+
+Frontend CI covers the production build, API contract generation check and browser regressions. A separate real-browser integration workflow exercises the frontend with the API and disposable MySQL. The frontend workflow uses path filters, so documentation-only changes do not trigger it. These checks do not replace deployed desktop/mobile HTTPS smoke tests.
+
+See [FE integration and membership handoff](docs/fe-membership-handoff.md) for the admin-entered registration scope, field requirements and review transitions. Monetary values use DECIMAL strings with currency; approval creates one order without activating membership. This handoff is a contract proposal and product baseline, not an implemented registration API or form.
+
 ## Scope and remaining work
 
-This is the first Sprint 0 slice, not a production-ready product. Membership, payment, production benefit wiring, outbox dispatch, email recovery, production user provisioning and frontend are pending. Hosting, staging verification, load testing and G0 acceptance remain open. No staging or production deployment is configured.
+This is a Sprint 0 foundation, not a production-ready product. Registration forms/APIs, membership, payment, production benefit wiring, outbox dispatch, email recovery and production user provisioning are pending. Registration implementation requires the reviewed member identity migration, versioned package contract and registration/review OpenAPI definitions. Profiles without login accounts must be supported without placeholder credentials.
+
+Hosting, staging verification, load testing and G0 acceptance remain open. No staging or production deployment is configured. Follow [the staging handoff](docs/staging-handoff.md) for build-time `VITE_API_ORIGIN` configuration and desktop/mobile HTTPS smoke acceptance.
 
 Read `docs/adr-001-backend-foundation.md` for decisions and limitations.
