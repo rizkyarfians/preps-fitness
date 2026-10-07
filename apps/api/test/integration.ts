@@ -1,3 +1,4 @@
+import { registrationScenarios } from './registration-scenarios.js';
 import { commandScenarios } from './command-scenarios.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -66,6 +67,7 @@ test('real MySQL auth and branch isolation', async t => {
    await request(app).get('/api/v1/me').set('Cookie', cookie).expect(401);
   });
   await commandScenarios(t, db, config.GYM_ID);
+  await registrationScenarios(t, db, config);
   await t.test('other gym access and cross-gym grant insertion are denied', async () => {
    await db.insert(gym).values({ id: 'gym-foreign', name: 'Gym B' });
    await db.insert(gymUser).values({ gymId: 'gym-foreign', userId: foreign.id });

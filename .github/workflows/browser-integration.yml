@@ -24,6 +24,7 @@ jobs:
       NODE_ENV: test
       DATABASE_URL: mysql://preps:ci-test-only@127.0.0.1:3306/preps_e2e
       E2E_DISPOSABLE_DATABASE: 'yes'
+      GYM_TIMEZONE: Asia/Jakarta
       GYM_ID: gym-e2e
       BETTER_AUTH_SECRET: ci-only-browser-secret-not-for-production-012345
       BETTER_AUTH_URL: http://localhost:3000

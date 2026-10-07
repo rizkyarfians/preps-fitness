@@ -4,6 +4,7 @@ const schema = z.object({
  PORT: z.coerce.number().int().min(1).max(65535).default(3000),
  DATABASE_URL: z.string().url().refine(v => v.startsWith('mysql://'), 'MySQL URL required'),
  GYM_ID: z.string().min(1),
+ GYM_TIMEZONE: z.string().min(1).refine(v => { try { new Intl.DateTimeFormat('en', { timeZone: v }).format(); return true; } catch { return false; } }, 'Valid IANA timezone required'),
  BETTER_AUTH_SECRET: z.string().min(32).refine(v => !v.startsWith('replace-'), 'Set a random secret'),
  BETTER_AUTH_URL: z.string().url(), WEB_ORIGIN: z.string().url(),
 });
