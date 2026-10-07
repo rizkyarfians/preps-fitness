@@ -61,9 +61,43 @@ Confirmed by product on 7 October 2026: admins enter registrations for the initi
 3. For `needs_clarification`, admin obtains corrected information, edits the permitted fields and resubmits through the SA submit operation, returning the registration to `pending_review`.
 4. An authorized reviewer can approve, reject or request clarification. Approval creates one order without activating membership. Rejection remains read-only with its reason and review history.
 
-The decision specifies who enters the registration, not whether the same admin may approve their own submission. Product and BE must settle that permission and expose the permitted actions. Actor identity and audit timestamps come from the server, not editable FE fields.
+For the initial pilot, an admin may review their own submission only when they also hold review permission for that branch. Entry permission alone does not confer review permission. Store submitter and reviewer separately even when they are the same person. Actor identity and audit timestamps come from the server, not editable FE fields.
 
-Registration capture and member login provisioning are separate contracts. BE must define how a new registration links to or creates the member identity and authentication account, including duplicate handling. FE must not invent passwords, expose signup, or assume registration approval creates login access. Member-facing screens below describe later authorized account access and are not part of the initial admin-entry slice.
+Registration capture and member login provisioning are separate contracts. A registration/member profile can exist without a login account. After approval, account creation/linking uses a separate invitation and verified-email flow; possession of an authenticated account and ownership of the invitation must be checked before linking. Admin-entered email alone is not proof of account ownership. Invitation delivery and acceptance are still unimplemented. FE must not invent passwords, expose signup, or assume registration approval creates login access. Member-facing screens below describe later authorized account access and are not part of the initial admin-entry slice.
+
+
+## Registration data baseline — product confirmation, 7 October 2026
+
+The product owner added address and place/date of birth and accepted the following requiredness. This supersedes the earlier exclusion of date of birth from this form.
+
+| API field | FE label | Required | Contract and validation |
+| --- | --- | --- | --- |
+| `fullName` | Nama lengkap | Yes | Trim surrounding whitespace; reject blank values. Preserve the person's spelling. |
+| `phone` | Nomor WhatsApp | Yes | Normalize to international form, e.g. `+6281234567890`. Indonesian local input beginning `08` can be normalized with an explicit Indonesia country selection; do not assume Indonesia for other country selections. Syntax validation does not prove WhatsApp ownership or availability. |
+| `address` | Alamat domisili | Yes | Trim; reject blank values. One multiline address field for the pilot. |
+| `birthPlace` | Tempat lahir | No | Trim; omit when empty. Stored separately from birth date. |
+| `birthDate` | Tanggal lahir | Yes | Calendar date string `YYYY-MM-DD`; reject nonexistent dates and future dates. Store as SQL DATE, not a timestamp; do not shift by browser timezone. |
+| `email` | Email | No at registration | Omit when empty; validate if supplied. Required later for the selected email-based login invitation. Registration email is unverified contact data. |
+| `branchId` | Cabang | Yes | Server checks the actor's permission for the selected branch. |
+| `planVersionId` | Paket | Yes | Select a published version permitted for that branch; server supplies the immutable offer snapshot. |
+
+BE must define numeric field-length bounds in the request schema and expose them to FE before the form ships. The future-date check uses the server's current calendar date in the configured gym timezone; FE mirrors it for feedback. Gym timezone configuration must be included in the runtime contract. No minimum-age eligibility rule is introduced by collecting birth date.
+
+For an existing member, reference `memberId` and display the authorized profile. Registration creation must not silently overwrite the shared member profile with edited contact or birth fields; any profile correction needs its own authorized update and conflict handling.
+
+### Duplicate handling and identity
+
+- Check for candidate duplicates across branches of the same gym business. A matching normalized phone/email or name plus birth date prompts review; none of these automatically merges people or links login accounts.
+- Admin chooses the existing identity or resolves why the candidate is a different person. Record that resolution; do not use a unique phone constraint that prevents legitimate shared family contacts.
+- Prevent another registration for the same resolved member and branch while one is `pending_review` or `needs_clarification`. BE must enforce this under concurrent requests; button disabling alone is insufficient.
+- Candidate lookup must honor permissions. If a match belongs to a branch the admin cannot inspect, expose only a conflict requiring an authorized reviewer, not the other branch's personal data.
+- Account linking requires verified ownership, and one login must not become attached to different member identities in the same gym accidentally. The existing member schema requires a user ID; a reviewed migration is needed to support profiles without login accounts. Do not create placeholder credentials to satisfy that constraint.
+
+### Review and personal-data boundaries
+
+Reject and clarify require a nonblank reason on both FE and BE. Corrected clarification submissions return to `pending_review`; rejected registrations have no automatic reopen action. Approval creates exactly one order and grants no active membership or benefits.
+
+Address and birth details appear only in authorized entry/review/profile views, not ordinary list rows, generic logs, audit payloads or notification text. Audit records reference the resource and actor rather than copying the profile. Existing no-personal-data localStorage and 401/403 cleanup rules apply. D03 retention and consent wording remain separate release decisions.
 
 ## Proposed membership screens
 
@@ -72,14 +106,14 @@ Initial delivery focuses on registration and review, then order/payment and acti
 | Screen | Proposed fields and displayed data | User actions | Page and domain states |
 | --- | --- | --- | --- |
 | Admin member/registration list | Search by name or member number; authorized branch; separate review and membership status filters; pagination. Rows show display name, member number if assigned, package snapshot, review/payment/membership status separately. | Search, filter, open detail; start registration if authorized | Initial loading, empty gym, no search matches, ready, background refresh, load error/retry, forbidden |
-| Admin registration form | `fullName`, `email`, `phone`, `branchId`, `planVersionId`; display package name, duration, price, currency and benefit summary from the server's offer. Required contact fields and limits need product agreement. Existing-member flow references `memberId` instead of creating another identity. | Choose a published package, review summary, submit; edit and resubmit after clarification | Editing, invalid fields, submitting, submitted, clarification required, conflict, unknown submit outcome |
+| Admin registration form | `fullName`, `phone`, `address`, `birthPlace`, `birthDate`, `email`, `branchId`, `planVersionId`; display package name, duration, price, currency and benefit summary from the server's offer. Requiredness follows the registration baseline above; numeric length bounds must be specified in the request schema. Existing-member flow references `memberId` instead of creating another identity. | Choose a published package, review summary, submit; edit and resubmit after clarification | Editing, invalid fields, submitting, submitted, clarification required, conflict, unknown submit outcome |
 | Admin registration review | Registration ID/version, submitted identity/contact, branch, immutable offer snapshot, submitted time, clarification history. `decision`, `reason`, `version` follow the SA review contract; show reviewer and review time from server history. | Request clarification; approve or reject with reason and confirmation; open resulting order only after approval | `pending_review`, `needs_clarification`, resubmitted back to `pending_review`, `approved` with order reference, `rejected` with reason/reviewer/time; submitting, stale-version conflict, access lost. Rejected detail is read-only; no automatic reopen or activation action. |
 | Order and manual payment | Server order number, offer snapshot, amount due, currency, verification history. Payment input: `amount` as a decimal string, `currency` fixed by order, `paidAt`, optional reference, private `proofMediaId` from upload/complete. Method and required metadata await product policy. | Upload/replace unsubmitted proof, submit payment; authorized admin verifies or requests correction with reason | Uploading, upload failed, submitted/unverified, verified, correction required, insufficient verified payment, amount/currency mismatch, timeout with unknown result |
 | Activation preview and confirmation | `orderId`, expected version; show authoritative eligibility, effective start/end, timezone, benefits and warnings. Requested date input only if product permits it. | Request preview, inspect impact, confirm once; refresh expired preview | Ineligible with reason, preview loading/ready/stale, committing, successful upcoming/active status supplied by server, conflict/reconciliation |
 | Member membership detail | Package snapshot, authoritative status, start/end, branch scope, available benefits, order/payment summary and permitted timeline events | View status/history, supply clarification or payment where authorized, request renewal when available | Registration rejected with reason (separate from membership status); no membership, upcoming, active, frozen, expired, cancelled; unavailable feature with reason |
 | Membership change preview | `membershipId`, expected version, action; optional target plan/version, requested dates and reason only as permitted by that action's agreed policy. Show server-calculated dates, amount impact and benefit impact. | Preview then confirm renewal/freeze/resume/cancel/upgrade where explicitly allowed | Action unavailable with reason, editing, preview ready/stale, submitting, success, conflict; policies unresolved means disabled |
 
-Do not include medical assessment, complaints, body photos, national ID or date of birth in this first operational registration form without a separate approved requirement. Do not offer direct edits to activation/expiry or a manual "mark active" control.
+Date of birth and place of birth are approved above. Do not add medical assessment, complaints, body photos or national ID to this operational form without a separate approved requirement. Do not offer direct edits to activation/expiry or a manual "mark active" control.
 
 ## Role and interaction rules
 
@@ -115,7 +149,7 @@ Shared conventions to agree:
 
 | Decision owner | Decisions to close | FE consequence while unresolved |
 | --- | --- | --- |
-| Product and gym — registration | Required contact fields, duplicate identity handling, member/account provisioning, whether an admin may review their own submission, optional reason taxonomy, cancellation or reopening after rejection if requested. Admin entry is confirmed for the pilot. Approve/reject/clarify and their SA transitions are already in scope | Do not silently require phone/email combinations or expose public signup |
+| Product and gym — registration | Optional reason taxonomy and cancellation/reopening after rejection if requested. Field requiredness, duplicate-review policy, separate login provisioning and self-review with review permission are fixed above. Invitation implementation, numeric validation limits and gym timezone exposure are BE contract work | Follow the confirmed field table; no public signup or automatic account linking |
 | Product and gym — activation/payment | Accepted payment methods, proof requirements, adjustment/overpayment rules, start-date authority, timezone/cutoff, partial payment eligibility | Display server reasons; do not invent eligibility or default activation dates |
 | Product and gym — renewal | Duration, overlap, early renewal, carry-forward and payment effect | No FE date arithmetic or automatic renewal rule |
 | Product and gym — freeze/resume | Eligibility, limits, duration, fee, expiry extension and effective-time rules | Keep actions disabled until policy and preview contract exist |
@@ -136,3 +170,6 @@ Next contract review should lock the registration/review slice first, including 
 6. Pilot fixtures cover admin entry in an authorized branch, denial for an unauthorized branch, correction/resubmission after clarification, and submit returning `pending_review` without automatic approval. Review visibility follows the agreed submitter/reviewer policy. Creating a registration must not silently create login credentials in the FE.
 
 These are contract acceptance requirements for subsequent implementation, not claims that tests or business endpoints already exist. Activation, renewal and freeze rules remain product decisions; neither inconsistency authorizes FE to redefine them.
+
+7. Registration fixtures must cover required address/date of birth, omitted optional birthplace/email, a real leap day, invalid calendar dates, future birth dates, date-only round trips, normalized contact candidates without auto-merge, an existing member with a pending same-branch registration, and denied candidate-detail access across unauthorized branches.
+8. Verify that self-review succeeds only with review permission; approval produces one order and no active membership, benefits or automatically linked login. These are future implementation acceptance cases, not executed tests.
