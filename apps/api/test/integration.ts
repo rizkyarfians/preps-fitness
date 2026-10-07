@@ -32,6 +32,7 @@ test('real MySQL auth and branch isolation', async t => {
    const me = await agent.get('/api/v1/me').expect(200);
    assert.equal(me.body.data.user.id, local.id);
    assert.deepEqual(me.body.data.entitlements, []);
+   assert.deepEqual(me.body.data.branchAccess, [{ branchId: 'branch-a', branchName: 'A', role: 'member' }]);
    await agent.get('/api/v1/branches/branch-a').expect(200);
    await agent.get('/api/v1/branches/branch-b').expect(403);
   });
