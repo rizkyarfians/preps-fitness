@@ -52,6 +52,19 @@ The SA handoff takes precedence over this FE proposal. These two requirements ar
 
 Use the SA review route `POST /registrations/{r}/review` with `decision`, `reason`, and `version`; the decision values are `approve`, `reject`, and `clarify`. Server identity supplies the actor and server time supplies the review timestamp. The FE requires a nonblank reason and a confirmation before sending a rejection. BE enforces authorization, transition validity, version checking and idempotency; another admin's completed decision is a conflict to refresh, not permission to overwrite it.
 
+## Pilot decision: admin-entered registration
+
+Confirmed by product on 7 October 2026: admins enter registrations for the initial pilot. The pilot FE scope is an admin registration list, entry form and review detail; public self-registration is outside this delivery.
+
+1. An authorized admin selects a permitted branch, enters the prospective member's identity/contact or selects an existing member, and chooses a published plan version.
+2. Admin reviews the summary and submits. The registration enters `pending_review`; admin entry does not imply approval or activation.
+3. For `needs_clarification`, admin obtains corrected information, edits the permitted fields and resubmits through the SA submit operation, returning the registration to `pending_review`.
+4. An authorized reviewer can approve, reject or request clarification. Approval creates one order without activating membership. Rejection remains read-only with its reason and review history.
+
+The decision specifies who enters the registration, not whether the same admin may approve their own submission. Product and BE must settle that permission and expose the permitted actions. Actor identity and audit timestamps come from the server, not editable FE fields.
+
+Registration capture and member login provisioning are separate contracts. BE must define how a new registration links to or creates the member identity and authentication account, including duplicate handling. FE must not invent passwords, expose signup, or assume registration approval creates login access. Member-facing screens below describe later authorized account access and are not part of the initial admin-entry slice.
+
 ## Proposed membership screens
 
 Initial delivery focuses on registration and review, then order/payment and activation preview as their APIs become available. Member identity, registration review, payment and membership lifecycle are distinct resources and statuses. Approval creates one order; it does not activate membership.
@@ -59,7 +72,7 @@ Initial delivery focuses on registration and review, then order/payment and acti
 | Screen | Proposed fields and displayed data | User actions | Page and domain states |
 | --- | --- | --- | --- |
 | Admin member/registration list | Search by name or member number; authorized branch; separate review and membership status filters; pagination. Rows show display name, member number if assigned, package snapshot, review/payment/membership status separately. | Search, filter, open detail; start registration if authorized | Initial loading, empty gym, no search matches, ready, background refresh, load error/retry, forbidden |
-| Registration form | `fullName`, `email`, `phone`, `branchId`, `planVersionId`; display package name, duration, price, currency and benefit summary from the server's offer. Required contact fields and limits need product agreement. Existing-member flow references `memberId` instead of creating another identity. | Choose a published package, review summary, submit; edit and resubmit after clarification | Editing, invalid fields, submitting, submitted, clarification required, conflict, unknown submit outcome |
+| Admin registration form | `fullName`, `email`, `phone`, `branchId`, `planVersionId`; display package name, duration, price, currency and benefit summary from the server's offer. Required contact fields and limits need product agreement. Existing-member flow references `memberId` instead of creating another identity. | Choose a published package, review summary, submit; edit and resubmit after clarification | Editing, invalid fields, submitting, submitted, clarification required, conflict, unknown submit outcome |
 | Admin registration review | Registration ID/version, submitted identity/contact, branch, immutable offer snapshot, submitted time, clarification history. `decision`, `reason`, `version` follow the SA review contract; show reviewer and review time from server history. | Request clarification; approve or reject with reason and confirmation; open resulting order only after approval | `pending_review`, `needs_clarification`, resubmitted back to `pending_review`, `approved` with order reference, `rejected` with reason/reviewer/time; submitting, stale-version conflict, access lost. Rejected detail is read-only; no automatic reopen or activation action. |
 | Order and manual payment | Server order number, offer snapshot, amount due, currency, verification history. Payment input: `amount` as a decimal string, `currency` fixed by order, `paidAt`, optional reference, private `proofMediaId` from upload/complete. Method and required metadata await product policy. | Upload/replace unsubmitted proof, submit payment; authorized admin verifies or requests correction with reason | Uploading, upload failed, submitted/unverified, verified, correction required, insufficient verified payment, amount/currency mismatch, timeout with unknown result |
 | Activation preview and confirmation | `orderId`, expected version; show authoritative eligibility, effective start/end, timezone, benefits and warnings. Requested date input only if product permits it. | Request preview, inspect impact, confirm once; refresh expired preview | Ineligible with reason, preview loading/ready/stale, committing, successful upcoming/active status supplied by server, conflict/reconciliation |
@@ -70,7 +83,7 @@ Do not include medical assessment, complaints, body photos, national ID or date 
 
 ## Role and interaction rules
 
-- Member sees only their records and permitted self-service actions. Admin sees operational registration/payment/membership data for authorized branches. Owner permissions are explicit, not inferred from the label. PT has no membership mutation privileges unless separately granted.
+- Initial pilot registration capture and clarification corrections are performed by authorized admins. Later member access shows only their records and permitted self-service actions. Admin sees operational registration/payment/membership data for authorized branches. Owner permissions are explicit, not inferred from the label. PT has no membership mutation privileges unless separately granted.
 - Request proposed `allowedActions` and disabled reason codes per resource from the backend. These drive presentation; every mutation must still be authorized server-side. Do not derive privileges from only the first role in `branchAccess`, because an account may have multiple grants for the same branch.
 - Keep editable values in component memory during background revalidation. Prompt before navigation or branch switching with unsaved edits. Clear sensitive values on confirmed account/session loss; no personal-data localStorage cache. Cross-login draft recovery requires a separate agreed policy.
 - Cancel/ignore old list/detail requests on branch or account changes. Scope caches by gym, user, branch and resource. Preserve list filters and page state across successful focus checks.
@@ -102,7 +115,7 @@ Shared conventions to agree:
 
 | Decision owner | Decisions to close | FE consequence while unresolved |
 | --- | --- | --- |
-| Product and gym — registration | Required contact fields, duplicate identity handling, self-registration access/provisioning, optional reason taxonomy, cancellation or reopening after rejection if requested. Approve/reject/clarify and their SA transitions are already in scope | Do not silently require phone/email combinations or expose public signup |
+| Product and gym — registration | Required contact fields, duplicate identity handling, member/account provisioning, whether an admin may review their own submission, optional reason taxonomy, cancellation or reopening after rejection if requested. Admin entry is confirmed for the pilot. Approve/reject/clarify and their SA transitions are already in scope | Do not silently require phone/email combinations or expose public signup |
 | Product and gym — activation/payment | Accepted payment methods, proof requirements, adjustment/overpayment rules, start-date authority, timezone/cutoff, partial payment eligibility | Display server reasons; do not invent eligibility or default activation dates |
 | Product and gym — renewal | Duration, overlap, early renewal, carry-forward and payment effect | No FE date arithmetic or automatic renewal rule |
 | Product and gym — freeze/resume | Eligibility, limits, duration, fee, expiry extension and effective-time rules | Keep actions disabled until policy and preview contract exist |
@@ -117,7 +130,9 @@ Next contract review should lock the registration/review slice first, including 
 1. OpenAPI represents every monetary field as `type: string` with currency, not an integer minor-unit field. BE/FE agree the decimal grammar, precision/scale, limits and field-specific sign rules without changing the string representation fixed by SA.
 2. Fixtures cover a decimal amount such as `"250000.00"`, a fractional amount, a boundary value within the agreed DECIMAL precision, malformed/localized API input, and currency mismatch. A numeric JSON amount is rejected under the agreed validation contract; exact string values must survive input, request and response without float conversion.
 3. Admin review has visible approve/reject/clarify actions according to server permissions. Reject requires reason/confirmation, shows pending state, prevents duplicate submission, and displays the server's `rejected` result with reason and review history. No payment/activation CTA is offered for that rejected registration.
-4. Member sees rejection and its reason without an invented resubmit/reopen action. Clarification uses the existing submit route to return to `pending_review` after corrections.
+4. Admin detail shows rejection and its reason without an invented resubmit/reopen action; later authorized member detail preserves that behavior. For this pilot, admin handles clarification corrections and uses the existing submit route to return to `pending_review`.
 5. Test concurrent approve versus reject, stale version, same-command retry, unknown timeout outcome, and 401/403. One accepted review wins; FE reconciles against current server state and never labels a rejected registration as active.
+
+6. Pilot fixtures cover admin entry in an authorized branch, denial for an unauthorized branch, correction/resubmission after clarification, and submit returning `pending_review` without automatic approval. Review visibility follows the agreed submitter/reviewer policy. Creating a registration must not silently create login credentials in the FE.
 
 These are contract acceptance requirements for subsequent implementation, not claims that tests or business endpoints already exist. Activation, renewal and freeze rules remain product decisions; neither inconsistency authorizes FE to redefine them.
