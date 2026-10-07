@@ -1,4 +1,4 @@
-import { mysqlTable, varchar, text, boolean, timestamp, index, uniqueIndex, primaryKey, foreignKey, mysqlEnum, json } from 'drizzle-orm/mysql-core';
+import { mysqlTable, varchar, text, boolean, timestamp, index, uniqueIndex, primaryKey, foreignKey, mysqlEnum, json, date } from 'drizzle-orm/mysql-core';
 const id = (name: string) => varchar(name, { length: 36 });
 const dates = () => ({ createdAt: timestamp('created_at', { fsp: 3 }).notNull().defaultNow(), updatedAt: timestamp('updated_at', { fsp: 3 }).notNull().defaultNow().$onUpdate(() => new Date()) });
 export const user = mysqlTable('auth_user', {
@@ -31,7 +31,11 @@ export const branchAccess = mysqlTable('branch_access', {
  foreignKey({ columns: [t.gymId, t.userId], foreignColumns: [gymUser.gymId, gymUser.userId] }),
 ]);
 export const member = mysqlTable('member', {
- id: id('id').primaryKey(), gymId: id('gym_id').notNull(), userId: id('user_id').notNull(), ...dates(),
+ id: id('id').primaryKey(), gymId: id('gym_id').notNull().references(() => gym.id), userId: id('user_id'),
+ // Nullable for existing profiles; new registration input requires complete identity fields.
+ fullName: varchar('full_name', { length: 200 }), phone: varchar('phone', { length: 16 }),
+ address: varchar('address', { length: 1000 }), birthPlace: varchar('birth_place', { length: 120 }),
+ birthDate: date('birth_date', { mode: 'string' }), email: varchar('email', { length: 254 }), ...dates(),
 }, t => [uniqueIndex('member_gym_user').on(t.gymId, t.userId), foreignKey({ columns: [t.gymId, t.userId], foreignColumns: [gymUser.gymId, gymUser.userId] })]);
 
 // Receipt and events are written in the SAME transaction as the domain mutation.

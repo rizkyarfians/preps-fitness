@@ -6,6 +6,9 @@ const spec = JSON.parse(
   ),
 );
 function type(s) {
+  if (s.nullable) return `(${type({ ...s, nullable: false })}) | null`;
+  if (s.oneOf) return s.oneOf.map(type).map(t => `(${t})`).join(" | ");
+  if (s.type === "integer") return "number";
   if (s.$ref) return s.$ref.split("/").at(-1);
   if (s.enum) return s.enum.map((v) => JSON.stringify(v)).join(" | ");
   if (s.type === "array") return `Array<${type(s.items)}>`;

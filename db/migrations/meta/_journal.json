@@ -15,6 +15,13 @@
       "when": 1791187230205,
       "tag": "0001_premium_blue_shield",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1791381005500,
+      "tag": "0002_rapid_expediter",
+      "breakpoints": true
     }
   ]
 }
