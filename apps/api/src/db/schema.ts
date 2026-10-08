@@ -100,7 +100,7 @@ export const registrationOrder = mysqlTable('registration_order', {
  id: id('id').primaryKey(), gymId: id('gym_id').notNull(), registrationId: id('registration_id').notNull().unique(),
  offer: json('offer').$type<import('../registration-validation.js').Offer>().notNull(),
  createdAt: timestamp('created_at', { fsp: 3 }).notNull().defaultNow(),
-}, t => [foreignKey({ columns: [t.gymId,t.registrationId], foreignColumns: [registration.gymId,registration.id] })]);
+}, t => [foreignKey({ name: 'registration_order_registration_fk', columns: [t.gymId,t.registrationId], foreignColumns: [registration.gymId,registration.id] })]);
 export const candidateCheck = mysqlTable('candidate_check', {
  id: id('id').primaryKey(), gymId: id('gym_id').notNull().references(() => gym.id), actorId: id('actor_id').notNull().references(() => user.id),
  branchId: id('branch_id').notNull(), identityHash: varchar('identity_hash', { length:64 }).notNull(),

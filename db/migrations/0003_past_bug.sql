@@ -73,6 +73,6 @@ ALTER TABLE `plan_version` ADD CONSTRAINT `plan_version_gym_id_branch_id_branch_
 ALTER TABLE `registration` ADD CONSTRAINT `registration_created_by_auth_user_id_fk` FOREIGN KEY (`created_by`) REFERENCES `auth_user`(`id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE `registration` ADD CONSTRAINT `registration_gym_id_branch_id_branch_gym_id_id_fk` FOREIGN KEY (`gym_id`,`branch_id`) REFERENCES `branch`(`gym_id`,`id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE `registration` ADD CONSTRAINT `registration_gym_id_member_id_member_gym_id_id_fk` FOREIGN KEY (`gym_id`,`member_id`) REFERENCES `member`(`gym_id`,`id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE `registration_order` ADD CONSTRAINT `registration_order_gym_id_registration_id_registration_gym_id_id_fk` FOREIGN KEY (`gym_id`,`registration_id`) REFERENCES `registration`(`gym_id`,`id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE `registration_order` ADD CONSTRAINT `registration_order_registration_fk` FOREIGN KEY (`gym_id`,`registration_id`) REFERENCES `registration`(`gym_id`,`id`) ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX `candidate_expiry` ON `candidate_check` (`expires_at`);--> statement-breakpoint
 CREATE INDEX `registration_branch_list` ON `registration` (`gym_id`,`branch_id`,`created_at`,`id`);
