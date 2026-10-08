@@ -8,6 +8,7 @@ export interface AppDeps {
  gymId: string; webOrigin: string; authHandler: RequestHandler;
  resolvePrincipal(req: Request): Promise<Principal | null>;
  getBranch(id: string): Promise<{ id: string; name: string } | null>;
+ registrationRouter?: RequestHandler;
  ready(): Promise<void>;
 }
 export function createApp(d: AppDeps) {
@@ -20,7 +21,7 @@ export function createApp(d: AppDeps) {
  app.get('/health/ready', async (_req, res) => { await d.ready(); res.json({ status: 'ok' }); });
  app.all('/api/v1/auth/*splat', d.authHandler);
  app.use(express.json({ limit: '64kb' }));
- const fail = (res: express.Response, status: number, reasonCode: string) => res.status(status).json({ error: { reasonCode, requestId: res.locals.requestId } });
+ const fail = (res: express.Response, status: number, reasonCode: string) => res.status(status).json({ error: { reasonCode, requestId: res.locals.requestId, retryable: status === 503 } });
  app.use('/api/v1', async (req, res, next) => {
   const p = await d.resolvePrincipal(req);
   if (!p) { fail(res, 401, 'UNAUTHENTICATED'); return; }
@@ -44,6 +45,7 @@ export function createApp(d: AppDeps) {
   if (!b) { fail(res, 404, 'NOT_FOUND'); return; }
   res.json({ data: b });
  });
+ if (d.registrationRouter) app.use('/api/v1', d.registrationRouter);
  app.use((_req, res) => { fail(res, 404, 'NOT_FOUND'); });
  const onError: ErrorRequestHandler = (err, _req, res, _next) => {
   if (err?.type === 'entity.parse.failed') { fail(res, 400, 'INVALID_JSON'); return; }

@@ -1,4 +1,4 @@
-import { mysqlTable, varchar, text, boolean, timestamp, index, uniqueIndex, primaryKey, foreignKey, mysqlEnum, json, date } from 'drizzle-orm/mysql-core';
+import { mysqlTable, varchar, text, boolean, timestamp, index, uniqueIndex, primaryKey, foreignKey, mysqlEnum, json, date, int } from 'drizzle-orm/mysql-core';
 const id = (name: string) => varchar(name, { length: 36 });
 const dates = () => ({ createdAt: timestamp('created_at', { fsp: 3 }).notNull().defaultNow(), updatedAt: timestamp('updated_at', { fsp: 3 }).notNull().defaultNow().$onUpdate(() => new Date()) });
 export const user = mysqlTable('auth_user', {
@@ -36,7 +36,7 @@ export const member = mysqlTable('member', {
  fullName: varchar('full_name', { length: 200 }), phone: varchar('phone', { length: 16 }),
  address: varchar('address', { length: 1000 }), birthPlace: varchar('birth_place', { length: 120 }),
  birthDate: date('birth_date', { mode: 'string' }), email: varchar('email', { length: 254 }), ...dates(),
-}, t => [uniqueIndex('member_gym_user').on(t.gymId, t.userId), foreignKey({ columns: [t.gymId, t.userId], foreignColumns: [gymUser.gymId, gymUser.userId] })]);
+}, t => [uniqueIndex('member_scope').on(t.gymId, t.id), uniqueIndex('member_gym_user').on(t.gymId, t.userId), foreignKey({ columns: [t.gymId, t.userId], foreignColumns: [gymUser.gymId, gymUser.userId] })]);
 
 // Receipt and events are written in the SAME transaction as the domain mutation.
 export const commandReceipt = mysqlTable('command_receipt', {
@@ -64,3 +64,45 @@ export const outboxEvent = mysqlTable('outbox_event', {
  createdAt: timestamp('created_at', { fsp: 3 }).notNull().defaultNow(),
  publishedAt: timestamp('published_at', { fsp: 3 }),
 }, t => [uniqueIndex('outbox_command_type').on(t.commandId, t.eventType), index('outbox_pending').on(t.publishedAt, t.createdAt)]);
+
+export const planVersion = mysqlTable('plan_version', {
+ id: id('id').primaryKey(), gymId: id('gym_id').notNull(), branchId: id('branch_id').notNull(),
+ planId: id('plan_id').notNull(), version: int('version').notNull(),
+ snapshot: json('snapshot').$type<import('../registration-validation.js').Offer>().notNull(),
+ selectable: boolean('selectable').notNull().default(true),
+ createdAt: timestamp('created_at', { fsp: 3 }).notNull().defaultNow(),
+}, t => [uniqueIndex('plan_branch_version').on(t.gymId, t.branchId, t.planId, t.version),
+ uniqueIndex('plan_scope').on(t.gymId, t.branchId, t.id),
+ foreignKey({ columns: [t.gymId, t.branchId], foreignColumns: [branch.gymId, branch.id] })]);
+export const memberBranch = mysqlTable('member_branch', {
+ gymId: id('gym_id').notNull(), branchId: id('branch_id').notNull(), memberId: id('member_id').notNull(),
+}, t => [primaryKey({ columns: [t.gymId, t.branchId, t.memberId] }),
+ foreignKey({ columns: [t.gymId, t.memberId], foreignColumns: [member.gymId, member.id] }),
+ foreignKey({ columns: [t.gymId, t.branchId], foreignColumns: [branch.gymId, branch.id] })]);
+export const registration = mysqlTable('registration', {
+ id: id('id').primaryKey(), gymId: id('gym_id').notNull(), branchId: id('branch_id').notNull(), memberId: id('member_id').notNull(),
+ newMember: boolean('new_member').notNull(),
+ identity: json('identity').$type<Partial<import('../registration-validation.js').Identity>>().notNull(),
+ offer: json('offer').$type<import('../registration-validation.js').Offer>().notNull(),
+ status: mysqlEnum('status', ['draft','pending_review','needs_clarification','approved','rejected']).notNull().default('draft'),
+ version: int('version').notNull().default(1), createdBy: id('created_by').notNull().references(() => user.id),
+ history: json('history').$type<import('../registration-validation.js').ReviewEvent[]>().notNull(),
+ submissions: json('submissions').$type<{identity:Partial<import('../registration-validation.js').Identity>;offer:import('../registration-validation.js').Offer;version:number;actorId:string;at:string}[]>().notNull(),
+ duplicateResolutions: json('duplicate_resolutions').$type<(import('../registration-validation.js').Resolution & {actorId:string;at:string})[]>().notNull(),
+ // Uniqueness only for pending/clarification. Null releases the slot after review.
+ pendingMemberId: id('pending_member_id'), orderId: id('order_id'), ...dates(),
+}, t => [uniqueIndex('registration_scope').on(t.gymId, t.id),
+ uniqueIndex('registration_pending_member').on(t.gymId, t.branchId, t.pendingMemberId),
+ index('registration_branch_list').on(t.gymId, t.branchId, t.createdAt, t.id),
+ foreignKey({ columns: [t.gymId,t.branchId], foreignColumns: [branch.gymId,branch.id] }),
+ foreignKey({ columns: [t.gymId,t.memberId], foreignColumns: [member.gymId,member.id] })]);
+export const registrationOrder = mysqlTable('registration_order', {
+ id: id('id').primaryKey(), gymId: id('gym_id').notNull(), registrationId: id('registration_id').notNull().unique(),
+ offer: json('offer').$type<import('../registration-validation.js').Offer>().notNull(),
+ createdAt: timestamp('created_at', { fsp: 3 }).notNull().defaultNow(),
+}, t => [foreignKey({ name: 'registration_order_registration_fk', columns: [t.gymId,t.registrationId], foreignColumns: [registration.gymId,registration.id] })]);
+export const candidateCheck = mysqlTable('candidate_check', {
+ id: id('id').primaryKey(), gymId: id('gym_id').notNull().references(() => gym.id), actorId: id('actor_id').notNull().references(() => user.id),
+ branchId: id('branch_id').notNull(), identityHash: varchar('identity_hash', { length:64 }).notNull(),
+ candidatesHash: varchar('candidates_hash', { length:64 }).notNull(), expiresAt: timestamp('expires_at', { fsp:3 }).notNull(),
+}, t => [index('candidate_expiry').on(t.expiresAt), foreignKey({ columns: [t.gymId,t.branchId], foreignColumns: [branch.gymId,branch.id] })]);

@@ -1,5 +1,6 @@
 import { and, eq, sql } from 'drizzle-orm';
 import { fromNodeHeaders, toNodeHandler } from 'better-auth/node';
+import { registrationRouter } from './registration-api.js';
 import { createApp } from './app.js';
 import { createAuth } from './auth.js';
 import { createDatabase } from './db/client.js';
@@ -9,6 +10,7 @@ export function createRuntime(config: Config) {
  const { db, pool } = createDatabase(config.DATABASE_URL);
  const auth = createAuth(db, config);
  const app = createApp({
+  registrationRouter: registrationRouter(db, config),
   gymId: config.GYM_ID, webOrigin: config.WEB_ORIGIN, authHandler: toNodeHandler(auth),
   async ready() {
    await db.execute(sql`SELECT 1`);

@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { and, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Database } from './db/client.js';
-import { auditEvent, branchAccess, commandReceipt, gymUser, outboxEvent } from './db/schema.js';
+import { auditEvent, branchAccess, commandReceipt, gym, gymUser, outboxEvent } from './db/schema.js';
 export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 export type Transaction = Parameters<Parameters<Database['transaction']>[0]>[0];
 export class CommandError extends Error {
@@ -31,6 +31,8 @@ export interface CommandRequest {
  actorId: string; branchId: string; operation: string; idempotencyKey: string; payload: JsonValue;
 }
 export interface CommandWork {
+ /** Serialize gym-wide invariants before acquiring account/receipt foreign-key locks. */
+ serializeGym?: boolean;
  /** Must check current operation-specific permissions using this transaction, including on replay. */
  authorize(tx: Transaction): Promise<void>;
  /** Database-only effects. No HTTP/email/provider calls; throw to roll everything back. */
@@ -45,6 +47,7 @@ export function createCommandRunner(db: Database, deploymentGym: string) {
   const requestHash = digest(payload);
   const scopeHash = digest([deploymentGym, input.actorId, input.branchId, input.operation, input.idempotencyKey]);
   return db.transaction(async tx => {
+   if (work.serializeGym) await tx.select({id:gym.id}).from(gym).where(eq(gym.id,deploymentGym)).for('update');
    // Serialize account revocation and permission edits against in-flight commands.
    const [account] = await tx.select().from(gymUser).where(and(eq(gymUser.gymId, deploymentGym), eq(gymUser.userId, input.actorId))).for('update');
    if (!account?.enabled) throw new CommandError('COMMAND_ACCESS_DENIED');

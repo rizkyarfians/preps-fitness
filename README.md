@@ -10,7 +10,7 @@ Requires Node.js 24 and Docker Compose (or a separate MySQL 8.4 server).
 2. Copy `.env.example` to `.env` and replace `BETTER_AUTH_SECRET` with a random secret of at least 32 characters (`openssl rand -hex 32`).
 3. Run `docker compose up -d --wait`.
 4. Run `npm run db:migrate`.
-5. Set `SEED_PASSWORD` to a development password of at least 12 characters, then run `npm run db:seed`. The seed is for an empty database and creates `admin@example.test` plus two branches. Never use real personal data. A partially failed seed may require a fresh disposable database.
+5. Set `SEED_PASSWORD` to a development password of at least 12 characters, then run `npm run db:seed`. The seed is for an empty database and creates `admin@example.test` plus two branches and demo plan versions. Never use real personal data. A partially failed seed may require a fresh disposable database.
 6. Run `npm run dev`.
 
 Do not commit `.env` or passwords. Local Compose credentials are disposable development values, never production credentials. Use PowerShell `$env:SEED_PASSWORD` or your shell's environment-variable mechanism; the password is not printed by the seed.
@@ -24,7 +24,7 @@ Do not commit `.env` or passwords. Local Compose credentials are disposable deve
 - `GET /api/v1/me`: identity and explicit branch-role grants; no paid benefits are granted yet.
 - `GET /api/v1/branches/{branchId}`: authorized branch summary.
 
-Frontend requests must include credentials. Auth mutations use the configured Origin. Keep frontend/API on the same origin behind a reverse proxy for production. Public signup is disabled; registration is a later slice. See `packages/contracts/openapi.yaml` for business endpoints and `docs/auth-contract.md` for auth integration.
+Frontend requests must include credentials. Auth mutations use the configured Origin. Keep frontend/API on the same origin behind a reverse proxy for production. Public signup is disabled; admin registration is implemented without creating login accounts. See `packages/contracts/openapi.yaml` for business endpoints and `docs/auth-contract.md` for auth integration.
 
 ## Validation
 
@@ -44,11 +44,11 @@ The responsive frontend includes login/logout, authorized branch selection using
 
 Frontend CI covers the production build, API contract generation check and browser regressions. A separate real-browser integration workflow exercises the frontend with the API and disposable MySQL. The frontend workflow uses path filters, so documentation-only changes do not trigger it. These checks do not replace deployed desktop/mobile HTTPS smoke tests.
 
-See [FE integration and membership handoff](docs/fe-membership-handoff.md) for the admin-entered registration scope, field requirements and review transitions. Monetary values use DECIMAL strings with currency; approval creates one order without activating membership. This handoff is a contract proposal and product baseline, not an implemented registration API or form.
+See [FE integration and membership handoff](docs/fe-membership-handoff.md) for the admin-entered registration scope, field requirements and review transitions. Monetary values use DECIMAL strings with currency; approval creates one order without activating membership. The API is implemented; see [registration API contract](docs/registration-api-contract.md) for FE setup and retry behavior. The FE form remains to be built.
 
 ## Scope and remaining work
 
-This is a Sprint 0 foundation, not a production-ready product. Registration forms/APIs, membership, payment, production benefit wiring, outbox dispatch, email recovery and production user provisioning are pending. Registration implementation requires the reviewed member identity migration, versioned package contract and registration/review OpenAPI definitions. Profiles without login accounts must be supported without placeholder credentials.
+This is a Sprint 0 foundation, not a production-ready product. Registration forms, membership, payment, production benefit wiring, outbox dispatch, email recovery and production user provisioning are pending. Apply migrations 0002 and 0003 before this API, and configure GYM_TIMEZONE explicitly. Unlinked member profiles require no placeholder credentials. Production plan publishing and member account invitations remain pending.
 
 Hosting, staging verification, load testing and G0 acceptance remain open. No staging or production deployment is configured. Follow [the staging handoff](docs/staging-handoff.md) for build-time `VITE_API_ORIGIN` configuration and desktop/mobile HTTPS smoke acceptance.
 

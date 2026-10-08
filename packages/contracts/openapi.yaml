@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Preps Fitness business API",
-    "version": "0.2.0",
-    "description": "Sprint 0 foundation. Better Auth endpoints use their native contract; see docs/auth-contract.md. Empty entitlements intentionally grant no benefits. Registration operations marked planned are contracts for FE mocks, not available routes."
+    "version": "0.3.0",
+    "description": "Business API with admin registration and review. Approval creates an order without membership activation. Better Auth uses its native contract."
   },
   "servers": [
     {
@@ -164,8 +164,8 @@
         "tags": [
           "Registration contract"
         ],
-        "x-implementation-status": "planned",
-        "description": "CONTRACT ONLY: handler not implemented in this release. Entry/review permissions aggregated across all grants in the requested branch.",
+        "x-implementation-status": "implemented",
+        "description": "Entry/review permissions aggregated across all grants in the requested branch.",
         "parameters": [
           {
             "name": "branchId",
@@ -286,6 +286,16 @@
                 }
               }
             }
+          },
+          "413": {
+            "description": "JSON body exceeds 64 KB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationError"
+                }
+              }
+            }
           }
         }
       }
@@ -296,8 +306,8 @@
         "tags": [
           "Registration contract"
         ],
-        "x-implementation-status": "planned",
-        "description": "CONTRACT ONLY: handler not implemented in this release. Only published, selectable versions for this branch; immutable price/duration/benefits.",
+        "x-implementation-status": "implemented",
+        "description": "Only published, selectable versions for this branch; immutable price/duration/benefits.",
         "parameters": [
           {
             "name": "branchId",
@@ -438,6 +448,16 @@
                 }
               }
             }
+          },
+          "413": {
+            "description": "JSON body exceeds 64 KB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationError"
+                }
+              }
+            }
           }
         }
       }
@@ -448,8 +468,8 @@
         "tags": [
           "Registration contract"
         ],
-        "x-implementation-status": "planned",
-        "description": "CONTRACT ONLY: handler not implemented in this release. ",
+        "x-implementation-status": "implemented",
+        "description": "",
         "parameters": [
           {
             "name": "planVersionId",
@@ -580,6 +600,16 @@
                 }
               }
             }
+          },
+          "413": {
+            "description": "JSON body exceeds 64 KB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationError"
+                }
+              }
+            }
           }
         }
       }
@@ -590,8 +620,8 @@
         "tags": [
           "Registration contract"
         ],
-        "x-implementation-status": "planned",
-        "description": "CONTRACT ONLY: handler not implemented in this release. Read-only search; body keeps contacts out of URL logs. Search within the deployment gym. Unauthorized matches return restrictedMatch=true without identifying details. No auto-linking.",
+        "x-implementation-status": "implemented",
+        "description": "Read-only search; body keeps contacts out of URL logs. Search within the deployment gym. Unauthorized matches return restrictedMatch=true without identifying details. No auto-linking. Send Origin equal to WEB_ORIGIN; browser requests include session credentials.",
         "parameters": [],
         "responses": {
           "200": {
@@ -701,6 +731,16 @@
                 }
               }
             }
+          },
+          "413": {
+            "description": "JSON body exceeds 64 KB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationError"
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -721,8 +761,8 @@
         "tags": [
           "Registration contract"
         ],
-        "x-implementation-status": "planned",
-        "description": "CONTRACT ONLY: handler not implemented in this release. ",
+        "x-implementation-status": "implemented",
+        "description": "",
         "parameters": [
           {
             "name": "branchId",
@@ -880,6 +920,16 @@
                 }
               }
             }
+          },
+          "413": {
+            "description": "JSON body exceeds 64 KB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationError"
+                }
+              }
+            }
           }
         }
       },
@@ -888,8 +938,8 @@
         "tags": [
           "Registration contract"
         ],
-        "x-implementation-status": "planned",
-        "description": "CONTRACT ONLY: handler not implemented in this release. Create draft and member profile or reference existing member. Does not create a login, order, membership or benefit.",
+        "x-implementation-status": "implemented",
+        "description": "Create draft and member profile or reference existing member. Does not create a login, order, membership or benefit. Send Origin equal to WEB_ORIGIN; browser requests include session credentials.",
         "parameters": [
           {
             "name": "Idempotency-Key",
@@ -1011,6 +1061,16 @@
                 }
               }
             }
+          },
+          "413": {
+            "description": "JSON body exceeds 64 KB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationError"
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -1031,8 +1091,8 @@
         "tags": [
           "Registration contract"
         ],
-        "x-implementation-status": "planned",
-        "description": "CONTRACT ONLY: handler not implemented in this release. ",
+        "x-implementation-status": "implemented",
+        "description": "",
         "parameters": [
           {
             "name": "registrationId",
@@ -1153,6 +1213,16 @@
                 }
               }
             }
+          },
+          "413": {
+            "description": "JSON body exceeds 64 KB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationError"
+                }
+              }
+            }
           }
         }
       },
@@ -1161,8 +1231,8 @@
         "tags": [
           "Registration contract"
         ],
-        "x-implementation-status": "planned",
-        "description": "CONTRACT ONLY: handler not implemented in this release. Only draft/needs_clarification. Identity edits affect the registration snapshot, not an existing shared profile. Branch/member identity cannot change. New-member corrections recheck duplicates.",
+        "x-implementation-status": "implemented",
+        "description": "Only draft/needs_clarification. Identity edits affect the registration snapshot, not an existing shared profile. Branch/member identity cannot change. New-member corrections recheck duplicates on submit. Send Origin equal to WEB_ORIGIN; browser requests include session credentials.",
         "parameters": [
           {
             "name": "registrationId",
@@ -1287,6 +1357,16 @@
           },
           "503": {
             "description": "Transient service failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "JSON body exceeds 64 KB",
             "content": {
               "application/json": {
                 "schema": {
@@ -1314,8 +1394,8 @@
         "tags": [
           "Registration contract"
         ],
-        "x-implementation-status": "planned",
-        "description": "CONTRACT ONLY: handler not implemented in this release. draft or needs_clarification -> pending_review. Requires complete identity and a valid published offer; immutable snapshot frozen on submit. No automatic approval.",
+        "x-implementation-status": "implemented",
+        "description": "draft or needs_clarification -> pending_review. Requires complete identity and a valid published offer; immutable snapshot frozen on submit. No automatic approval. Send Origin equal to WEB_ORIGIN; browser requests include session credentials.",
         "parameters": [
           {
             "name": "registrationId",
@@ -1440,6 +1520,16 @@
           },
           "503": {
             "description": "Transient service failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "JSON body exceeds 64 KB",
             "content": {
               "application/json": {
                 "schema": {
@@ -1467,8 +1557,8 @@
         "tags": [
           "Registration contract"
         ],
-        "x-implementation-status": "planned",
-        "description": "CONTRACT ONLY: handler not implemented in this release. pending_review -> approved/rejected/needs_clarification. Approve creates exactly one order in the same transaction and returns orderId. Reject/clarify return no orderId. Does not activate membership or grant benefits.",
+        "x-implementation-status": "implemented",
+        "description": "pending_review -> approved/rejected/needs_clarification. Approve creates exactly one order in the same transaction and returns orderId. Reject/clarify return no orderId. Does not activate membership or grant benefits. Send Origin equal to WEB_ORIGIN; browser requests include session credentials.",
         "parameters": [
           {
             "name": "registrationId",
@@ -1600,6 +1690,16 @@
                 }
               }
             }
+          },
+          "413": {
+            "description": "JSON body exceeds 64 KB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationError"
+                }
+              }
+            }
           }
         },
         "requestBody": {
@@ -1620,8 +1720,8 @@
         "tags": [
           "Registration contract"
         ],
-        "x-implementation-status": "planned",
-        "description": "CONTRACT ONLY: planned authorized profile lookup for existing-member selection. Requires access to the member in the requested branch. No profile update or account linking.",
+        "x-implementation-status": "implemented",
+        "description": "Authorized profile lookup for existing-member selection. Requires operational permission in requested branch and visibility through any operational branch. No profile update or account linking.",
         "parameters": [
           {
             "name": "memberId",
@@ -1745,6 +1845,16 @@
           },
           "503": {
             "description": "Transient service failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "JSON body exceeds 64 KB",
             "content": {
               "application/json": {
                 "schema": {
@@ -1901,7 +2011,7 @@
             "maxLength": 10,
             "format": "date",
             "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
-            "description": "Real calendar date, not after context.today in gym timezone. No minimum-age policy implied."
+            "description": "Real calendar date >=1000-01-01 and not after context.today in gym timezone. No age threshold."
           },
           "email": {
             "type": "string",
@@ -2412,7 +2522,7 @@
                 "maxLength": 10,
                 "format": "date",
                 "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
-                "description": "Real calendar date, not after context.today in gym timezone. No minimum-age policy implied."
+                "description": "Real calendar date >=1000-01-01 and not after context.today in gym timezone. No age threshold."
               },
               "email": {
                 "type": "string",
@@ -2617,7 +2727,8 @@
           "commandId",
           "replayed",
           "registration"
-        ]
+        ],
+        "description": "Replays preserve commandId and resource ID; registration contains the current authorized state, not a historical response."
       },
       "RegistrationError": {
         "type": "object",
@@ -2646,7 +2757,9 @@
                   "PROFILE_INCOMPLETE",
                   "PLAN_UNAVAILABLE",
                   "RATE_LIMITED",
-                  "SERVICE_UNAVAILABLE"
+                  "SERVICE_UNAVAILABLE",
+                  "INVALID_JSON",
+                  "PAYLOAD_TOO_LARGE"
                 ]
               },
               "requestId": {
@@ -2742,7 +2855,7 @@
                 "maxLength": 10,
                 "format": "date",
                 "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
-                "description": "Real calendar date, not after context.today in gym timezone. No minimum-age policy implied."
+                "description": "Real calendar date >=1000-01-01 and not after context.today in gym timezone. No age threshold."
               },
               "email": {
                 "type": "string",
