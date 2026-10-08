@@ -47,6 +47,8 @@ export async function registrationScenarios(t:TestContext,db:Database,config:Con
   await db.update(planVersion).set({selectable:false}).where(eq(planVersion.id,'plan-a'));
   const body={version:r.version,decision:'approve'};
   r=(await post(route+'/review',body,'approve-once').expect(200)).body.data.registration;
+  const [stored]=await db.select().from(registration).where(eq(registration.id,r.id));
+  assert.equal(stored!.submissions.length,2);assert.notEqual(stored!.submissions[0]!.identity.address,stored!.submissions[1]!.identity.address);
   assert.equal(r.status,'approved');assert.ok(r.orderId);assert.equal(r.history.length,2);assert.equal(r.offer.price.amount,'250000.00');
   const replay=await post(route+'/review',body,'approve-once').expect(200);assert.equal(replay.body.data.replayed,true);
   assert.equal((await db.select().from(registrationOrder).where(eq(registrationOrder.registrationId,r.id))).length,1);
@@ -73,7 +75,11 @@ export async function registrationScenarios(t:TestContext,db:Database,config:Con
   await post('/registrations',{branchId:'branch-a',planVersionId:'plan-a',identity:i}).expect(409);
   const check=(await post('/member-candidates',{branchId:'branch-a',identity:i}).expect(200)).body.data;
   assert.equal(check.candidates[0].memberId,r.memberId);
-  await post('/registrations',{branchId:'branch-a',planVersionId:'plan-a',identity:i,duplicateResolution:{decision:'distinct_person',reason:'Shared family contact',candidateCheckId:check.candidateCheckId}}).expect(201);
+  const distinct=(await post('/registrations',{branchId:'branch-a',planVersionId:'plan-a',identity:i,duplicateResolution:{decision:'distinct_person',reason:'Shared family contact',candidateCheckId:check.candidateCheckId}}).expect(201)).body.data.registration;
+  const fresh=(await post('/member-candidates',{branchId:'branch-a',identity:i}).expect(200)).body.data;
+  await post(`/registrations/${distinct.id}/submit`,{version:distinct.version,duplicateResolution:{decision:'distinct_person',reason:'Confirmed shared contact',candidateCheckId:fresh.candidateCheckId}}).expect(200);
+  const [stored]=await db.select().from(registration).where(eq(registration.id,distinct.id));
+  assert.equal(stored!.duplicateResolutions.length,2);assert.equal(stored!.submissions.length,1);
   await post('/registrations',{branchId:'branch-a',planVersionId:'plan-a',identity:i,duplicateResolution:{decision:'distinct_person',reason:'Shared family contact',candidateCheckId:check.candidateCheckId}}).expect(409);
   const secret=identity();await db.insert(member).values({id:'hidden-profile',gymId:config.GYM_ID,...secret});await db.insert(memberBranch).values({gymId:config.GYM_ID,memberId:'hidden-profile',branchId:'branch-b'});
   const hidden=(await post('/member-candidates',{branchId:'branch-a',identity:secret}).expect(200)).body.data;
