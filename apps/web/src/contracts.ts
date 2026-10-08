@@ -1,3 +1,26 @@
 // Generated from packages/contracts/openapi.yaml. Run npm run contracts.
 export type Error = { "error": { "reasonCode": "UNAUTHENTICATED" | "ACCOUNT_ACCESS_DENIED" | "BRANCH_ACCESS_DENIED" | "NOT_FOUND" | "SERVICE_UNAVAILABLE" | "INVALID_JSON" | "PAYLOAD_TOO_LARGE"; "requestId": string } };
 export type Me = { "user": { "id": string; "name": string; "email": string }; "gymId": string; "branchAccess": Array<{ "branchId": string; "role": "owner" | "admin" | "pt" | "member"; "branchName": string }>; "entitlements": Array<string> };
+export type RegistrationIdentity = { "fullName": string; "phone": string; "address": string; "birthPlace"?: string; "birthDate": string; "email"?: string };
+export type RegistrationAction = "create" | "edit" | "submit" | "approve" | "reject" | "clarify";
+export type RegistrationStatus = "draft" | "pending_review" | "needs_clarification" | "approved" | "rejected";
+export type RegistrationContext = { "gymId": string; "branchId": string; "timezone": string; "today": string; "asOf": string; "allowedActions": Array<RegistrationAction> };
+export type Money = { "amount": string; "currency": string };
+export type PlanVersion = { "id": string; "planId": string; "version": number; "branchId": string; "name": string; "publishedAt": string; "price": Money; "duration": { "value": number; "unit": "day" | "month" }; "benefits": Array<string> };
+export type DuplicateResolution = { "decision": "distinct_person"; "reason": string; "candidateCheckId": string };
+export type NewRegistration = { "branchId": string; "planVersionId": string; "identity": RegistrationIdentity; "duplicateResolution"?: DuplicateResolution };
+export type ExistingMemberRegistration = { "branchId": string; "planVersionId": string; "memberId": string };
+export type CreateRegistration = (NewRegistration) | (ExistingMemberRegistration);
+export type EditRegistration = { "version": number; "planVersionId": string; "identity"?: RegistrationIdentity };
+export type SubmitRegistration = { "version": number; "duplicateResolution"?: DuplicateResolution };
+export type ReviewRegistration = ({ "decision": "approve"; "version": number; "reason"?: string }) | ({ "decision": "reject" | "clarify"; "version": number; "reason": string });
+export type ReviewEvent = { "decision": "approve" | "reject" | "clarify"; "actorId": string; "reason": string; "at": string; "version": number };
+export type RegistrationSummary = { "id": string; "branchId": string; "memberId": string; "fullName": string; "status": RegistrationStatus; "version": number; "planName": string; "createdAt": string; "allowedActions": Array<RegistrationAction> };
+export type Registration = { "id": string; "branchId": string; "memberId": string; "identity": { "fullName"?: string; "phone"?: string; "address"?: string; "birthPlace"?: string; "birthDate"?: string; "email"?: string }; "status": RegistrationStatus; "version": number; "offer": PlanVersion; "createdBy": string; "createdAt": string; "updatedAt": string; "allowedActions": Array<RegistrationAction>; "history": Array<ReviewEvent>; "orderId"?: string; "profileComplete": boolean };
+export type RegistrationPage = { "items": Array<RegistrationSummary>; "nextCursor"?: string };
+export type PlanVersionPage = { "items": Array<PlanVersion>; "nextCursor"?: string };
+export type CandidateCheck = { "branchId": string; "identity": RegistrationIdentity };
+export type CandidateResult = { "candidateCheckId": string; "expiresAt": string; "restrictedMatch": boolean; "candidates": Array<{ "memberId": string; "displayName": string; "matchReasons": Array<"phone" | "email" | "name_birth_date"> }> };
+export type RegistrationCommandResult = { "commandId": string; "replayed": boolean; "registration": Registration };
+export type RegistrationError = { "error": { "reasonCode": "UNAUTHENTICATED" | "ACCOUNT_ACCESS_DENIED" | "BRANCH_ACCESS_DENIED" | "ACTION_NOT_ALLOWED" | "NOT_FOUND" | "VALIDATION_FAILED" | "STALE_VERSION" | "INVALID_TRANSITION" | "IDEMPOTENCY_CONFLICT" | "COMMAND_IN_PROGRESS" | "DUPLICATE_REVIEW_REQUIRED" | "DUPLICATE_CHECK_STALE" | "EXISTING_REGISTRATION" | "PROFILE_INCOMPLETE" | "PLAN_UNAVAILABLE" | "RATE_LIMITED" | "SERVICE_UNAVAILABLE" | "INVALID_JSON" | "PAYLOAD_TOO_LARGE"; "requestId": string; "fieldErrors"?: Array<{ "field": string; "code": "REQUIRED" | "TOO_LONG" | "INVALID_FORMAT" | "INVALID_DATE" | "FUTURE_DATE" | "UNKNOWN_FIELD" }>; "currentVersion"?: number; "retryable": boolean } };
+export type MemberProfile = { "id": string; "profileComplete": boolean; "identity": { "fullName"?: string; "phone"?: string; "address"?: string; "birthPlace"?: string; "birthDate"?: string; "email"?: string }; "accountLinked": boolean };

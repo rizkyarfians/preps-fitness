@@ -1,3 +1,4 @@
+import { registrationScenarios } from './registration-scenarios.js';
 import { commandScenarios } from './command-scenarios.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -6,7 +7,7 @@ import { eq, and } from 'drizzle-orm';
 import { readConfig } from '../src/config.js';
 import { createRuntime } from '../src/runtime.js';
 import { createAuth } from '../src/auth.js';
-import { gym, branch, gymUser, branchAccess } from '../src/db/schema.js';
+import { gym, branch, gymUser, branchAccess, member } from '../src/db/schema.js';
 // Run only against a newly migrated, disposable test database.
 const config = readConfig(process.env);
 if (config.NODE_ENV !== 'test') throw new Error('Integration suite requires NODE_ENV=test');
@@ -23,6 +24,19 @@ test('real MySQL auth and branch isolation', async t => {
   await db.insert(gymUser).values({ gymId: config.GYM_ID, userId: local.id });
   await db.insert(branch).values([{ id: 'branch-a', gymId: config.GYM_ID, name: 'A' }, { id: 'branch-b', gymId: config.GYM_ID, name: 'B' }]);
   await db.insert(branchAccess).values({ gymId: config.GYM_ID, branchId: 'branch-a', userId: local.id, role: 'member' });
+  await t.test('profiles without login preserve date-only values and gym/account constraints', async () => {
+   await db.insert(member).values([
+    { id: 'profile-unlinked-a', gymId: config.GYM_ID, fullName: 'Synthetic A', phone: '+6281234567890', address: 'Test address', birthDate: '2000-02-29' },
+    { id: 'profile-unlinked-b', gymId: config.GYM_ID, fullName: 'Synthetic B', phone: '+6281234567890', address: 'Test address', birthDate: '2001-01-01' },
+    { id: 'profile-linked', gymId: config.GYM_ID, userId: local.id },
+   ]);
+   const [profile] = await db.select().from(member).where(eq(member.id, 'profile-unlinked-a'));
+   assert.equal(profile?.userId, null);
+   assert.equal(profile?.birthDate, '2000-02-29');
+   await assert.rejects(db.insert(member).values({ id: 'duplicate-link', gymId: config.GYM_ID, userId: local.id }));
+   await assert.rejects(db.insert(member).values({ id: 'orphan-gym', gymId: 'missing-gym' }));
+   await assert.rejects(db.insert(member).values({ id: 'wrong-link', gymId: config.GYM_ID, userId: foreign.id }));
+  });
   const agent = request.agent(app);
   const signIn = () => agent.post('/api/v1/auth/sign-in/email').set('Origin', config.WEB_ORIGIN).send({ email: local.email, password });
   await t.test('healthy deployment and database-backed login', async () => {
@@ -53,6 +67,7 @@ test('real MySQL auth and branch isolation', async t => {
    await request(app).get('/api/v1/me').set('Cookie', cookie).expect(401);
   });
   await commandScenarios(t, db, config.GYM_ID);
+  await registrationScenarios(t, db, config);
   await t.test('other gym access and cross-gym grant insertion are denied', async () => {
    await db.insert(gym).values({ id: 'gym-foreign', name: 'Gym B' });
    await db.insert(gymUser).values({ gymId: 'gym-foreign', userId: foreign.id });

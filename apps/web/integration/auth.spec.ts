@@ -56,6 +56,21 @@ test('real cookie login, named branches, branch denial and logout revoke', async
   const denied = await context.request.get(`${api}/branches/e2e-no-grant`);
   expect(denied.status()).toBe(403);
   expect((await denied.json()).error.reasonCode).toBe('BRANCH_ACCESS_DENIED');
+  // Exercise real registration HTTP handlers with the browser's authenticated cookies.
+  const branchId=me.branchAccess[0].branchId;
+  const plans=await context.request.get(`${api}/plan-versions?branchId=${branchId}`);
+  expect(plans.status()).toBe(200);
+  const planVersionId=(await plans.json()).data.items[0].id;
+  const command=async(path:string,data:object,key:string)=>{
+    const response=await context.request.post(`${api}${path}`,{headers:{Origin:'http://localhost:5173','Idempotency-Key':key},data});
+    expect(response.ok(),await response.text()).toBe(true);return (await response.json()).data.registration;
+  };
+  let registration=await command('/registrations',{branchId,planVersionId,identity:{fullName:'Browser Synthetic',phone:'+62811123456789',address:'Test only',birthDate:'2000-01-01'}},'browser-create');
+  registration=await command(`/registrations/${registration.id}/submit`,{version:registration.version},'browser-submit');
+  expect(registration.status).toBe('pending_review');
+  registration=await command(`/registrations/${registration.id}/review`,{version:registration.version,decision:'approve'},'browser-approve');
+  expect(registration.status).toBe('approved');expect(registration.orderId).toBeTruthy();
+  expect((await (await context.request.get(`${api}/me`)).json()).data.entitlements).toEqual([]);
   const cookies = await context.cookies();
   expect(cookies.some(c => c.name.includes('session_token') && c.httpOnly)).toBe(true);
   const oldSession = await playwright.request.newContext({ storageState: await context.storageState() });

@@ -23,6 +23,7 @@ jobs:
     env:
       NODE_ENV: test
       DATABASE_URL: mysql://preps:ci-test-only@127.0.0.1:3306/preps_test
+      GYM_TIMEZONE: Asia/Jakarta
       GYM_ID: gym-test
       BETTER_AUTH_SECRET: ci-only-not-a-production-secret-0123456789
       BETTER_AUTH_URL: http://localhost:3000
