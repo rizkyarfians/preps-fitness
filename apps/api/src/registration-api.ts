@@ -5,7 +5,7 @@ import { z } from 'zod';
 import type { Database } from './db/client.js';
 import type { Config } from './config.js';
 import type { Principal } from './access.js';
-import { createCommandRunner, CommandError, type Transaction, type JsonValue } from './commands.js';
+import { createCommandRunner, CommandError, canonicalJson, type Transaction, type JsonValue } from './commands.js';
 import { member, memberBranch, branchAccess, planVersion, registration, registrationOrder, candidateCheck } from './db/schema.js';
 import { identifier, identitySchema, createSchema, editSchema, submitSchema, reviewSchema, todayIn, completeIdentity, validateIdentity, actions, RegistrationError, type Identity, type Resolution, type Offer } from './registration-validation.js';
 type Executor = Database | Transaction;
@@ -18,7 +18,7 @@ const asyncRoute = (fn:(req:Request,res:Response)=>Promise<void>) => (req:Reques
 export function registrationRouter(db:Database, config:Config) {
  const router = Router();
  const run = createCommandRunner(db,config.GYM_ID);
- const hash = (value: unknown) => createHmac('sha256',config.BETTER_AUTH_SECRET).update(JSON.stringify(value)).digest('hex');
+ const hash = (value: unknown) => createHmac('sha256',config.BETTER_AUTH_SECRET).update(canonicalJson(JSON.parse(JSON.stringify(value)) as JsonValue)).digest('hex');
  const principal = (res:Response) => res.locals.principal as Principal;
  const parse = <T>(schema:z.ZodType<T>, value:unknown):T => {
   const r = schema.safeParse(value);
