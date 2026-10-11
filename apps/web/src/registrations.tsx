@@ -713,9 +713,6 @@ export function Registrations({
                                     : "text"
                             }
                             min={key === "birthDate" ? "1000-01-01" : undefined}
-                            max={
-                              key === "birthDate" ? context?.today : undefined
-                            }
                             maxLength={
                               key === "fullName"
                                 ? 200
