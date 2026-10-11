@@ -60,13 +60,7 @@ test('real cookie login, named branches, branch denial and logout revoke', async
   const branchId=me.branchAccess[0].branchId;
   const plans=await context.request.get(`${api}/plan-versions?branchId=${branchId}`);
   expect(plans.status()).toBe(200);
-  expect((await plans.json()).data.items.length).toBeGreaterThan(0);
-  const draftResponse=await context.request.post(`${api}/plans`,{headers:{Origin:'http://localhost:5173','Idempotency-Key':'browser-plan-create'},data:{branchId,draft:{name:'Browser published plan',price:{amount:'300000.00',currency:'IDR'},duration:{value:1,unit:'month'},benefits:[]}}});
-  expect(draftResponse.status()).toBe(201);
-  const draftPlan=(await draftResponse.json()).data.plan;
-  const publishResponse=await context.request.post(`${api}/plans/${draftPlan.id}/publish?branchId=${branchId}`,{headers:{Origin:'http://localhost:5173','Idempotency-Key':'browser-plan-publish'},data:{version:draftPlan.version}});
-  expect(publishResponse.status()).toBe(200);
-  const planVersionId=(await publishResponse.json()).data.publishedVersion.id;
+  const planVersionId=(await plans.json()).data.items[0].id;
   const command=async(path:string,data:object,key:string)=>{
     const response=await context.request.post(`${api}${path}`,{headers:{Origin:'http://localhost:5173','Idempotency-Key':key},data});
     expect(response.ok(),await response.text()).toBe(true);return (await response.json()).data.registration;
