@@ -48,7 +48,7 @@ See [FE integration and membership handoff](docs/fe-membership-handoff.md) for t
 
 ## Scope and remaining work
 
-This is a Sprint 0 foundation, not a production-ready product. Registration forms, membership, payment, production benefit wiring, outbox dispatch, email recovery and production user provisioning are pending. Apply migrations 0002 and 0003 before this API, and configure GYM_TIMEZONE explicitly. Unlinked member profiles require no placeholder credentials. Production plan publishing and member account invitations remain pending.
+This is a Sprint 0 foundation, not a production-ready product. Registration forms, membership, payment, production benefit wiring, outbox dispatch, email recovery and production user provisioning are pending. Apply migrations 0002 and 0003 before this API, and configure GYM_TIMEZONE explicitly. Unlinked member profiles require no placeholder credentials. Plan draft/edit/publish APIs are available after migration 0004; see [plan management](docs/plan-management-api.md). Member account invitations remain pending.
 
 Hosting, staging verification, load testing and G0 acceptance remain open. No staging or production deployment is configured. Follow [the staging handoff](docs/staging-handoff.md) for build-time `VITE_API_ORIGIN` configuration and desktop/mobile HTTPS smoke acceptance.
 

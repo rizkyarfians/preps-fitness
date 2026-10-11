@@ -4,7 +4,7 @@ OpenAPI in `packages/contracts/openapi.yaml` is the source for payload shapes, l
 
 ## FE quick start
 
-Set explicit `GYM_TIMEZONE=Asia/Jakarta` (or the gym's actual IANA zone), run `npm run db:migrate`, then on an empty disposable database `npm run db:seed` with `SEED_PASSWORD`. The seed creates two branches with selectable demo plan versions. Existing deployments need real published plans provisioned; no plan publishing/admin UI is included.
+Set explicit `GYM_TIMEZONE=Asia/Jakarta` (or the gym's actual IANA zone), run `npm run db:migrate`, then on an empty disposable database `npm run db:seed` with `SEED_PASSWORD`. The seed creates two branches with selectable demo plan versions. Existing deployments can provision plans through the draft/edit/publish API after migration 0004; see plan-management-api.md. A plan management UI is not included.
 
 Sign in, choose `branchId` from `/me`, fetch `/registration-context` and `/plan-versions?branchId=...`. POST `/registrations` with `branchId`, `planVersionId`, and `identity`; retain returned ID/version. POST `/registrations/{id}/submit` with that version. Review using `/registrations/{id}/review`, current version and decision `approve`, `reject`, or `clarify`. Reject/clarify require reason. Each mutation needs a unique `Idempotency-Key`; retry the exact request with the same key. Send cookies (`credentials: include`) and Origin matching WEB_ORIGIN. Browser fetch sets Origin automatically.
 
