@@ -322,3 +322,24 @@ test("mobile form fits, preserves edits on cancelled navigation, reject requires
     page.getByRole("button", { name: "Kirim untuk review" }),
   ).toHaveCount(0);
 });
+
+test("distinct-person reason is required and used for create and resubmit", async ({
+  page,
+}) => {
+  const f = await setup(page, "duplicate");
+  await fill(page);
+  await page.getByRole("button", { name: "Simpan draft", exact: true }).click();
+  await page
+    .getByLabel("Alasan orang berbeda")
+    .fill("Kontak keluarga yang sama, identitas berbeda");
+  await page.getByRole("button", { name: "Simpan draft", exact: true }).click();
+  await expect(page.locator(".reg-status")).toHaveText("Draft");
+  await page.getByRole("button", { name: "Kirim untuk review" }).click();
+  await expect(page.getByLabel("Alasan orang berbeda")).toBeVisible();
+  expect(f.counts().submitCalls).toBe(0);
+  await page
+    .getByLabel("Alasan orang berbeda")
+    .fill("Sudah diperiksa sebagai orang berbeda");
+  await page.getByRole("button", { name: "Kirim untuk review" }).click();
+  await expect(page.locator(".reg-status")).toHaveText("Menunggu review");
+});

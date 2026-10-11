@@ -300,6 +300,22 @@ export function Registrations({
     setCandidate(c);
     return c;
   }
+  function resolutionReviewed(c: CandidateResult, exclude?: string) {
+    const ids = (value?: CandidateResult) =>
+      value?.candidates
+        .filter((x) => x.memberId !== exclude)
+        .map((x) => x.memberId)
+        .sort()
+        .join(",");
+    if (distinct.trim() && ids(candidate) !== ids(c)) {
+      setDistinct("");
+      setNotice(
+        "Daftar kecocokan berubah. Tinjau kembali sebelum menyatakan orang berbeda.",
+      );
+      return false;
+    }
+    return true;
+  }
   async function execute(c: Command) {
     setPending(c);
     try {
@@ -363,6 +379,7 @@ export function Registrations({
       );
       return;
     }
+    if (!resolutionReviewed(c)) return;
     if (c.candidates.length && !distinct.trim()) {
       setNotice("Pilih member yang sudah ada atau isi alasan orang berbeda.");
       return;
@@ -391,6 +408,7 @@ export function Registrations({
       setNotice("Ada kecocokan terbatas. Hubungi reviewer berwenang.");
       return;
     }
+    if (!resolutionReviewed(c, record.memberId)) return;
     if (others.length && !distinct.trim()) {
       setNotice(
         "Periksa kecocokan identitas dan isi alasan orang berbeda sebelum mengirim.",

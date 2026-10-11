@@ -722,6 +722,7 @@ small {
   border: 0;
 }
 .skip {
+  clip-path: inset(50%);
   position: fixed;
   top: -80px;
   left: 20px;
@@ -731,6 +732,7 @@ small {
   padding: 15px;
 }
 .skip:focus {
+  clip-path: none;
   top: 10px;
 }
 @media (min-width: 1500px) {
