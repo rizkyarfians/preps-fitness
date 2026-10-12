@@ -722,6 +722,7 @@ small {
   border: 0;
 }
 .skip {
+  clip-path: inset(50%);
   position: fixed;
   top: -80px;
   left: 20px;
@@ -731,6 +732,7 @@ small {
   padding: 15px;
 }
 .skip:focus {
+  clip-path: none;
   top: 10px;
 }
 @media (min-width: 1500px) {
@@ -923,5 +925,166 @@ small {
   *:after {
     animation: none !important;
     transition: none !important;
+  }
+}
+
+.registrations fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.reg-panel {
+  background: #181a1c;
+  border: 1px solid #333638;
+  padding: 24px;
+  margin: 18px 0;
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+}
+.reg-panel h3 {
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 26px;
+  margin: 0 0 20px;
+}
+.reg-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.registrations label {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  font-size: 13px;
+  color: #c5c5c5;
+}
+.registrations input,
+.registrations textarea,
+.registrations select {
+  width: 100%;
+  background: #101214;
+  border: 1px solid #494b4e;
+  color: #f4f2ed;
+  border-radius: 5px;
+  padding: 12px;
+  font: inherit;
+  min-height: 46px;
+  box-sizing: border-box;
+}
+.registrations textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+.registrations input:focus,
+.registrations textarea:focus,
+.registrations select:focus {
+  outline: 2px solid #bda46c;
+  outline-offset: 2px;
+}
+.registrations [aria-invalid="true"] {
+  border-color: #e9a290;
+}
+.registrations button:disabled,
+.registrations fieldset:disabled {
+  opacity: 0.65;
+}
+.reg-toolbar,
+.reg-toolbar form,
+.reg-actions {
+  display: flex;
+  gap: 14px;
+  align-items: end;
+  flex-wrap: wrap;
+}
+.reg-toolbar {
+  justify-content: space-between;
+  margin: 24px 0;
+}
+.reg-toolbar form {
+  flex: 1;
+}
+.reg-actions {
+  margin-top: 22px;
+}
+.reg-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  text-align: left;
+  width: 100%;
+  background: #181a1c;
+  color: #f4f2ed;
+  border: 1px solid #333638;
+  padding: 20px;
+  margin: 10px 0;
+  border-radius: 7px;
+}
+.reg-row > span:first-child {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.reg-row small {
+  display: block;
+  margin-top: 8px;
+  color: #aaa;
+}
+.reg-status {
+  display: inline-block;
+  font-size: 12px;
+  padding: 7px 10px;
+  border-radius: 4px;
+  background: #313235;
+  color: #ddd;
+}
+.reg-status.pending_review,
+.reg-status.needs_clarification {
+  background: #403720;
+  color: #f2dca0;
+}
+.reg-status.approved {
+  background: #213c30;
+  color: #b6e6c9;
+}
+.reg-status.rejected {
+  background: #472925;
+  color: #f3c2b9;
+}
+.reg-grid dt {
+  color: #999;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.reg-grid dd {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.reg-review,
+.reg-history {
+  border-top: 1px solid #383a3c;
+  margin-top: 20px;
+  padding-top: 20px;
+}
+.reg-history small {
+  color: #aaa;
+}
+@media (max-width: 650px) {
+  .reg-grid {
+    grid-template-columns: 1fr;
+  }
+  .reg-panel {
+    padding: 18px;
+  }
+  .reg-toolbar form,
+  .reg-toolbar label {
+    width: 100%;
+  }
+  .reg-row {
+    gap: 8px;
+    padding: 14px;
+  }
+  .reg-actions button {
+    flex: 1;
   }
 }

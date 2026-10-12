@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   ArrowRight,
@@ -26,6 +26,7 @@ import "@fontsource/inter/600.css";
 import "./styles.css";
 import { ApiError, auth, errorText, getBranch, getMe } from "./api";
 import type { Me } from "./contracts";
+import { Registrations } from "./registrations";
 
 type Role = Me["branchAccess"][number]["role"];
 const roles: Record<Role, string> = {
@@ -377,7 +378,32 @@ function Shell({
     [retry, setRetry] = useState(0),
     [page, setPage] = useState("overview"),
     [menu, setMenu] = useState(false);
-  const role = me.branchAccess.find((b) => b.branchId === branchId)?.role;
+  const [dirty, setDirty] = useState(false);
+  const dirtyChanged = useCallback((value: boolean) => setDirty(value), []);
+  const [commandPending, setCommandPending] = useState(false);
+  const blockChanged = useCallback(
+    (value: boolean) => setCommandPending(value),
+    [],
+  );
+  const canLeave = () => {
+    if (commandPending) {
+      window.alert(
+        "Konfirmasi permintaan yang masih diproses sebelum berpindah halaman.",
+      );
+      return false;
+    }
+    return (
+      !dirty || window.confirm("Tinggalkan perubahan yang belum disimpan?")
+    );
+  };
+  const branchRoles = me.branchAccess
+    .filter((b) => b.branchId === branchId)
+    .map((b) => b.role);
+  const operational = branchRoles.some((r) => r === "owner" || r === "admin");
+  const role =
+    branchRoles.find((r) => r === "owner") ||
+    branchRoles.find((r) => r === "admin") ||
+    branchRoles[0];
   useEffect(() => {
     const controller = new AbortController();
     setBranch(null);
@@ -394,7 +420,9 @@ function Shell({
         });
     return () => controller.abort();
   }, [branchId, retry]);
-  const available = modules.filter((m) => role && m.roles.includes(role));
+  const available = modules.filter((m) =>
+    branchRoles.some((r) => m.roles.includes(r)),
+  );
   const selected = available.find((m) => m.id === page);
   const date = new Intl.DateTimeFormat("id-ID", {
     day: "numeric",
@@ -402,6 +430,7 @@ function Shell({
     year: "numeric",
   }).format(new Date());
   const go = (id: string) => {
+    if (id !== page && !canLeave()) return;
     setPage(id);
     setMenu(false);
   };
@@ -471,7 +500,9 @@ function Shell({
               className="icon-button"
               aria-label="Keluar"
               disabled={busy}
-              onClick={logout}
+              onClick={() => {
+                if (canLeave()) void logout();
+              }}
             >
               <LogOut size={18} />
             </button>
@@ -501,7 +532,9 @@ function Shell({
             <select
               id="branch"
               value={branchId}
-              onChange={(e) => selectBranch(e.target.value)}
+              onChange={(e) => {
+                if (canLeave()) selectBranch(e.target.value);
+              }}
               disabled={!me.branchAccess.length}
             >
               {!me.branchAccess.length && (
@@ -565,6 +598,14 @@ function Shell({
             />
           ) : !branch || branch.id !== branchId ? (
             <p role="status">Memuat cabang…</p>
+          ) : selected?.id === "members" && operational ? (
+            <Registrations
+              key={branchId}
+              branchId={branchId}
+              onSessionError={onSessionError}
+              onDirty={dirtyChanged}
+              onBlock={blockChanged}
+            />
           ) : selected ? (
             <Empty
               title={`${selected.title.toUpperCase()} SEGERA HADIR`}
@@ -617,7 +658,11 @@ function Shell({
                     <h3>{m.title}</h3>
                     <p>{m.description}</p>
                     <div className="card-bottom">
-                      <span>Segera hadir</span>
+                      <span>
+                        {m.id === "members" && operational
+                          ? "Buka registrasi"
+                          : "Segera hadir"}
+                      </span>
                       <ArrowUpRight size={20} />
                     </div>
                   </button>

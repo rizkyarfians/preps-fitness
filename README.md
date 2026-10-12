@@ -40,15 +40,15 @@ A fail-closed benefit evaluator and transactional command runner are included. T
 
 ## Frontend foundation
 
-The responsive frontend includes login/logout, authorized branch selection using branch names, and role-aware workspace navigation. Background session refresh preserves the current page; session revalidation returning 401/403 clears private content. Business module screens are not yet implemented.
+The responsive frontend includes login/logout, authorized branch selection using branch names, and role-aware workspace navigation. Background session refresh preserves the current page; session revalidation returning 401/403 clears private content. The admin Membership workspace includes the registration list, input form, duplicate checks and review detail against the real API.
 
 Frontend CI covers the production build, API contract generation check and browser regressions. A separate real-browser integration workflow exercises the frontend with the API and disposable MySQL. The frontend workflow uses path filters, so documentation-only changes do not trigger it. These checks do not replace deployed desktop/mobile HTTPS smoke tests.
 
-See [FE integration and membership handoff](docs/fe-membership-handoff.md) for the admin-entered registration scope, field requirements and review transitions. Monetary values use DECIMAL strings with currency; approval creates one order without activating membership. The API is implemented; see [registration API contract](docs/registration-api-contract.md) for FE setup and retry behavior. The FE form remains to be built.
+See [FE integration and membership handoff](docs/fe-membership-handoff.md) for the admin-entered registration scope, field requirements and review transitions. Monetary values use DECIMAL strings with currency; approval creates one order without activating membership. The API is implemented; see [registration API contract](docs/registration-api-contract.md) for FE setup and retry behavior. See [the FE demo guide](apps/web/README.md#admin-registration-demo) for draft → submit → clarification → correction → approval and rejection.
 
 ## Scope and remaining work
 
-This is a Sprint 0 foundation, not a production-ready product. Registration forms, membership, payment, production benefit wiring, outbox dispatch, email recovery and production user provisioning are pending. Apply migrations 0002 and 0003 before this API, and configure GYM_TIMEZONE explicitly. Unlinked member profiles require no placeholder credentials. Production plan publishing and member account invitations remain pending.
+This is a Sprint 0 foundation, not a production-ready product. Membership activation, payment, production benefit wiring, outbox dispatch, email recovery and production user provisioning are pending. Apply migrations 0002 and 0003 before this API, and configure GYM_TIMEZONE explicitly. Unlinked member profiles require no placeholder credentials. Production plan publishing and member account invitations remain pending.
 
 Hosting, staging verification, load testing and G0 acceptance remain open. No staging or production deployment is configured. Follow [the staging handoff](docs/staging-handoff.md) for build-time `VITE_API_ORIGIN` configuration and desktop/mobile HTTPS smoke acceptance.
 

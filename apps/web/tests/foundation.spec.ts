@@ -49,6 +49,19 @@ async function fixture(
               },
               401,
             );
+    if (path.endsWith("/registration-context"))
+      return json({
+        data: {
+          gymId: "gym-1",
+          branchId: "central",
+          timezone: "Asia/Jakarta",
+          today: "2026-10-08",
+          asOf: "2026-10-08T00:00:00Z",
+          allowedActions: ["create"],
+        },
+      });
+    if (path.endsWith("/plan-versions") || path.endsWith("/registrations"))
+      return json({ data: { items: [] } });
     if (path.endsWith("/branches/central"))
       return json({ data: { id: "central", name: "PREPS Central" } });
     if (path.endsWith("/branches/east"))
@@ -163,7 +176,7 @@ test("mobile 360px fits and navigation works", async ({ page }) => {
   await page.getByRole("button", { name: "Buka navigasi" }).click();
   await page.getByRole("button", { name: "Membership", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "MEMBERSHIP SEGERA HADIR" }),
+    page.getByRole("heading", { name: "REGISTRASI MEMBER" }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Buka navigasi" }),
@@ -204,7 +217,7 @@ test("focus revalidation preserves the page and mounted workspace while pending 
   await page.goto("/");
   await page.getByRole("button", { name: "Membership", exact: true }).click();
   const heading = page.getByRole("heading", {
-    name: "MEMBERSHIP SEGERA HADIR",
+    name: "REGISTRASI MEMBER",
   });
   await expect(heading).toBeVisible();
   await page
@@ -247,13 +260,13 @@ test("temporary session check failure preserves workspace and supports retry", a
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await expect(page.getByRole("alert")).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "MEMBERSHIP SEGERA HADIR" }),
+    page.getByRole("heading", { name: "REGISTRASI MEMBER" }),
   ).toBeVisible();
   await page.route("**/api/v1/me", (r) => r.fulfill({ json: { data: user } }));
   await page.getByRole("button", { name: "Periksa sesi lagi" }).click();
   await expect(page.getByRole("alert")).toHaveCount(0);
   await expect(
-    page.getByRole("heading", { name: "MEMBERSHIP SEGERA HADIR" }),
+    page.getByRole("heading", { name: "REGISTRASI MEMBER" }),
   ).toBeVisible();
 });
 
