@@ -1,3 +1,4 @@
+import { createPlanSchema, editPlanSchema, publishPlanSchema, planContentSchema } from './plan-validation.js';
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { and, eq, or, inArray, asc, gt, sql } from 'drizzle-orm';
@@ -6,7 +7,7 @@ import type { Database } from './db/client.js';
 import type { Config } from './config.js';
 import type { Principal } from './access.js';
 import { createCommandRunner, CommandError, canonicalJson, type Transaction, type JsonValue } from './commands.js';
-import { member, memberBranch, branchAccess, planVersion, registration, registrationOrder, candidateCheck } from './db/schema.js';
+import { member, memberBranch, branchAccess, plan, planVersion, registration, registrationOrder, candidateCheck } from './db/schema.js';
 import { identifier, identitySchema, createSchema, editSchema, submitSchema, reviewSchema, todayIn, completeIdentity, validateIdentity, actions, RegistrationError, type Identity, type Resolution, type Offer } from './registration-validation.js';
 type Executor = Database | Transaction;
 type Row = typeof registration.$inferSelect;
@@ -104,6 +105,73 @@ export function registrationRouter(db:Database, config:Config) {
   if(!['GET','HEAD'].includes(req.method) && req.get('origin')!==config.WEB_ORIGIN) { next(new RegistrationError(403,'ACTION_NOT_ALLOWED'));return; }
   next();
  });
+ // Plan authoring uses the same branch authorization, cursor and command guarantees.
+ const planView = (p:typeof plan.$inferSelect) => ({id:p.id,branchId:p.branchId,draft:p.draft,status:p.status,version:p.version,
+  ...(p.latestVersionId?{latestVersionId:p.latestVersionId}:{}),createdAt:p.createdAt.toISOString(),updatedAt:p.updatedAt.toISOString(),
+  allowedActions:p.status==='draft'?['edit','publish']:['edit']});
+ async function getPlan(tx:Executor,actor:string,branchId:string,id:string) {
+  await authorize(tx,actor,branchId);
+  const [p]=await tx.select().from(plan).where(and(eq(plan.gymId,config.GYM_ID),eq(plan.branchId,branchId),eq(plan.id,id)));
+  if(!p)throw new RegistrationError(404,'NOT_FOUND');return p;
+ }
+ router.get('/plans',asyncRoute(async(req,res)=>{
+  const actor=principal(res).user.id,branchId=parse(identifier,req.query.branchId);await authorize(db,actor,branchId);
+  const p=pageArgs(req,actor,['plan-management',branchId]);
+  const rows=await db.select().from(plan).where(and(eq(plan.gymId,config.GYM_ID),eq(plan.branchId,branchId),p.after?gt(plan.id,p.after):undefined)).orderBy(asc(plan.id)).limit(p.limit+1);
+  const list=rows.slice(0,p.limit);res.json({data:{items:list.map(planView),...(rows.length>p.limit?{nextCursor:p.cursor(list.at(-1)!.id)}:{})}});
+ }));
+ router.get('/plans/:id',asyncRoute(async(req,res)=>{
+  res.json({data:planView(await getPlan(db,principal(res).user.id,parse(identifier,req.query.branchId),parse(identifier,req.params.id)))});
+ }));
+ router.get('/plans/:id/versions',asyncRoute(async(req,res)=>{
+  const actor=principal(res).user.id,branchId=parse(identifier,req.query.branchId),id=parse(identifier,req.params.id);
+  await getPlan(db,actor,branchId,id);const p=pageArgs(req,actor,['plan-history',branchId,id]);
+  const rows=await db.select().from(planVersion).where(and(eq(planVersion.gymId,config.GYM_ID),eq(planVersion.branchId,branchId),eq(planVersion.planId,id),p.after?gt(planVersion.id,p.after):undefined)).orderBy(asc(planVersion.id)).limit(p.limit+1);
+  const list=rows.slice(0,p.limit);res.json({data:{items:list.map(r=>({offer:r.snapshot,selectable:r.selectable})),...(rows.length>p.limit?{nextCursor:p.cursor(list.at(-1)!.id)}:{})}});
+ }));
+ async function planCommand(req:Request,res:Response,branchId:string,operation:string,payload:unknown,execute:(tx:Transaction)=>Promise<{id:string;publishedVersionId?:string}>,created=false) {
+  const actor=principal(res).user.id;
+  const key=parse(z.string().min(1).max(128).regex(/^[a-zA-Z0-9._:-]+$/),req.get('Idempotency-Key'));
+  const result=await run({actorId:actor,branchId,operation,idempotencyKey:key,payload:JSON.parse(JSON.stringify(payload)) as JsonValue},{
+   serializeGym:true,authorize:tx=>authorize(tx,actor,branchId),execute:async tx=>{
+    const ids=await execute(tx);return {result:ids,resourceId:ids.publishedVersionId||ids.id,events:[operation]};
+   },
+  });
+  const ids=result.result as {id:string;publishedVersionId?:string};
+  const current=await getPlan(db,actor,branchId,ids.id);
+  // A publish replay identifies its original immutable version even after later publications.
+  const [published]=ids.publishedVersionId?await db.select().from(planVersion).where(and(eq(planVersion.gymId,config.GYM_ID),eq(planVersion.branchId,branchId),eq(planVersion.id,ids.publishedVersionId))):[];
+  res.status(created&&!result.replayed?201:200).json({data:{commandId:result.commandId,replayed:result.replayed,plan:planView(current),...(published?{publishedVersion:published.snapshot}:{})}});
+ }
+ router.post('/plans',asyncRoute(async(req,res)=>{
+  const body=parse(createPlanSchema,req.body);
+  await planCommand(req,res,body.branchId,'plan.create',body,async tx=>{
+   const id=randomUUID();await tx.insert(plan).values({id,gymId:config.GYM_ID,branchId:body.branchId,draft:body.draft});return {id};
+  },true);
+ }));
+ async function mutatePlan(req:Request,res:Response,publish:boolean) {
+  const actor=principal(res).user.id,id=parse(identifier,req.params.id),branchId=parse(identifier,req.query.branchId);
+  const body=publish?parse(publishPlanSchema,req.body):parse(editPlanSchema,req.body);
+  await planCommand(req,res,branchId,publish?'plan.publish':'plan.edit',{id,...body},async tx=>{
+   const p=await getPlan(tx,actor,branchId,id);
+   if(p.version!==body.version)throw new RegistrationError(409,'STALE_VERSION',{currentVersion:p.version});
+   const where=and(eq(plan.gymId,config.GYM_ID),eq(plan.branchId,branchId),eq(plan.id,id));
+   if(!publish) {
+    await tx.update(plan).set({draft:(body as z.infer<typeof editPlanSchema>).draft,status:'draft',version:p.version+1}).where(where);return {id};
+   }
+   if(p.status!=='draft')throw new RegistrationError(409,'INVALID_TRANSITION');
+   const content=parse(planContentSchema,p.draft);
+   const [latest]=await tx.select({version:planVersion.version}).from(planVersion).where(and(eq(planVersion.gymId,config.GYM_ID),eq(planVersion.branchId,branchId),eq(planVersion.planId,id))).orderBy(sql`${planVersion.version} DESC`).limit(1);
+   if((latest?.version||0)>=2147483647)throw new RegistrationError(409,'INVALID_TRANSITION');
+   const publishedVersionId=randomUUID();
+   const snapshot:Offer={...content,id:publishedVersionId,planId:id,branchId,version:(latest?.version||0)+1,publishedAt:new Date().toISOString()};
+   await tx.insert(planVersion).values({id:publishedVersionId,gymId:config.GYM_ID,branchId,planId:id,version:snapshot.version,snapshot});
+   await tx.update(plan).set({status:'published',version:p.version+1,latestVersionId:publishedVersionId}).where(where);
+   return {id,publishedVersionId};
+  });
+ }
+ router.patch('/plans/:id',asyncRoute((req,res)=>mutatePlan(req,res,false)));
+ router.post('/plans/:id/publish',asyncRoute((req,res)=>mutatePlan(req,res,true)));
  router.get('/registration-context',asyncRoute(async(req,res)=>{
   const branchId=parse(identifier,req.query.branchId);await authorize(db,principal(res).user.id,branchId);
   res.json({data:{gymId:config.GYM_ID,branchId,timezone:config.GYM_TIMEZONE,today:todayIn(config.GYM_TIMEZONE),asOf:new Date().toISOString(),allowedActions:['create']}});

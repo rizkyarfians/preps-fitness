@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm';
 import { readConfig } from './config.js';
 import { createDatabase } from './db/client.js';
 import { createAuth } from './auth.js';
-import { gym, branch, gymUser, branchAccess, planVersion } from './db/schema.js';
+import { gym, branch, gymUser, branchAccess, plan, planVersion } from './db/schema.js';
 const config = readConfig(process.env);
 if (config.NODE_ENV === 'production') throw new Error('Development seed is forbidden in production');
 const password = process.env.SEED_PASSWORD;
@@ -24,6 +24,8 @@ try {
    const planId = randomUUID();
    await tx.insert(planVersion).values({ id: planId, gymId: config.GYM_ID, branchId, planId, version: 1,
     snapshot: { id: planId, planId, branchId, version: 1, name: 'Demo Monthly', publishedAt: new Date().toISOString(), price: { amount: '250000.00', currency: 'IDR' }, duration: { value: 1, unit: 'month' }, benefits: [] } });
+   await tx.insert(plan).values({id:planId,gymId:config.GYM_ID,branchId,status:'published',latestVersionId:planId,
+    draft:{name:'Demo Monthly',price:{amount:'250000.00',currency:'IDR'},duration:{value:1,unit:'month'},benefits:[]}});
    await tx.insert(branchAccess).values({ gymId: config.GYM_ID, branchId, userId: user.id, role: 'admin' });
   }
  });
