@@ -305,8 +305,19 @@ export function Plans({
       ([k]) => k === key || k.startsWith(`${key}.`),
     );
     return matches.length ? (
-      <small className="plan-field-error" role="alert">
-        {matches.map(([k, v]) => `${k}: ${v}`).join(" · ")}
+      <small id={`plan-error-${key}`} className="plan-field-error" role="alert">
+        {matches
+          .map(
+            ([, v]) =>
+              (
+                ({
+                  REQUIRED: "Wajib diisi.",
+                  TOO_LONG: "Nilai terlalu panjang.",
+                  INVALID_FORMAT: "Format tidak valid.",
+                }) as Record<string, string>
+              )[v] || v,
+          )
+          .join(" · ")}
       </small>
     ) : null;
   };
@@ -476,6 +487,11 @@ export function Plans({
                   <label>
                     Nama paket
                     <input
+                      aria-label="Nama paket"
+                      aria-invalid={Object.keys(fields).some(
+                        (k) => k === "name" || k.startsWith("name."),
+                      )}
+                      aria-describedby="plan-error-name"
                       value={form.name}
                       maxLength={200}
                       onChange={(e) => change("name", e.target.value)}
@@ -487,6 +503,12 @@ export function Plans({
                     <input
                       inputMode="decimal"
                       placeholder="350000.00"
+                      aria-label="Harga"
+                      aria-invalid={Object.keys(fields).some(
+                        (k) =>
+                          k === "price.amount" || k.startsWith("price.amount."),
+                      )}
+                      aria-describedby="plan-error-price.amount"
                       value={form.amount}
                       onChange={(e) => change("amount", e.target.value)}
                     />
@@ -495,6 +517,13 @@ export function Plans({
                   <label>
                     Mata uang
                     <input
+                      aria-label="Mata uang"
+                      aria-invalid={Object.keys(fields).some(
+                        (k) =>
+                          k === "price.currency" ||
+                          k.startsWith("price.currency."),
+                      )}
+                      aria-describedby="plan-error-price.currency"
                       value={form.currency}
                       maxLength={3}
                       onChange={(e) =>
@@ -507,6 +536,11 @@ export function Plans({
                     Durasi
                     <input
                       inputMode="numeric"
+                      aria-label="Durasi"
+                      aria-invalid={Object.keys(fields).some(
+                        (k) => k === "duration" || k.startsWith("duration."),
+                      )}
+                      aria-describedby="plan-error-duration"
                       value={form.duration}
                       onChange={(e) => change("duration", e.target.value)}
                     />
@@ -526,6 +560,11 @@ export function Plans({
                     Benefit (satu per baris)
                     <textarea
                       rows={5}
+                      aria-label="Benefit (satu per baris)"
+                      aria-invalid={Object.keys(fields).some(
+                        (k) => k === "benefits" || k.startsWith("benefits."),
+                      )}
+                      aria-describedby="plan-error-benefits"
                       value={form.benefits}
                       onChange={(e) => change("benefits", e.target.value)}
                     />

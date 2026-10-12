@@ -94,7 +94,9 @@ for (const mobile of [false, true])
         branchId,
         planVersionId: offer.id,
         identity: {
-          fullName: "Package Browser Synthetic",
+          fullName: mobile
+            ? "Package Mobile Synthetic"
+            : "Package Desktop Synthetic",
           phone: mobile ? "+62819999555556" : "+62819999555555",
           address: "Test only",
           birthDate: "2000-01-01",
