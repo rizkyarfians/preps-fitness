@@ -65,6 +65,16 @@ export const outboxEvent = mysqlTable('outbox_event', {
  publishedAt: timestamp('published_at', { fsp: 3 }),
 }, t => [uniqueIndex('outbox_command_type').on(t.commandId, t.eventType), index('outbox_pending').on(t.publishedAt, t.createdAt)]);
 
+// Mutable authoring state; every publication is a separate immutable plan_version.
+export const plan = mysqlTable('plan', {
+ id: id('id').notNull(), gymId: id('gym_id').notNull(), branchId: id('branch_id').notNull(),
+ draft: json('draft').$type<import('../plan-validation.js').PlanDraftContent>().notNull(),
+ version: int('version').notNull().default(1),
+ status: mysqlEnum('status', ['draft','published']).notNull().default('draft'),
+ latestVersionId: id('latest_version_id'), ...dates(),
+}, t => [primaryKey({columns:[t.gymId,t.branchId,t.id]}),
+ foreignKey({name:'plan_branch_fk',columns:[t.gymId,t.branchId],foreignColumns:[branch.gymId,branch.id]})]);
+
 export const planVersion = mysqlTable('plan_version', {
  id: id('id').primaryKey(), gymId: id('gym_id').notNull(), branchId: id('branch_id').notNull(),
  planId: id('plan_id').notNull(), version: int('version').notNull(),
