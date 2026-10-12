@@ -1139,3 +1139,11 @@ small {
 .plans label {
   min-width: 0;
 }
+.plans .reg-panel .section-heading {
+  margin: 0 0 20px;
+}
+.plans h3,
+.plans h4,
+.plans li {
+  overflow-wrap: anywhere;
+}

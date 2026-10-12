@@ -370,7 +370,7 @@ export function Plans({
       )}
       {conflict && record && (
         <button
-          className="retry"
+          className="secondary"
           disabled={busy}
           onClick={() => {
             if (leave()) void work(() => detail(record.id));
@@ -401,7 +401,7 @@ export function Plans({
               Buat paket
             </button>
             <button
-              className="retry"
+              className="secondary"
               disabled={busy}
               onClick={() => void work(() => loadList())}
             >
@@ -438,7 +438,7 @@ export function Plans({
           </div>
           {list.nextCursor && (
             <button
-              className="retry"
+              className="secondary"
               disabled={busy}
               onClick={() => void work(() => loadList(list.nextCursor))}
             >
@@ -449,7 +449,7 @@ export function Plans({
       ) : (
         <>
           <button
-            className="reg-back"
+            className="text-button"
             disabled={busy || !!pending}
             onClick={() => {
               if (leave()) {
@@ -577,7 +577,7 @@ export function Plans({
                   </button>
                   {record && (
                     <button
-                      className="retry"
+                      className="secondary"
                       type="button"
                       onClick={() => {
                         if (leave()) {
@@ -635,7 +635,7 @@ export function Plans({
                   <div className="reg-actions">
                     {record.allowedActions.includes("edit") && (
                       <button
-                        className="retry"
+                        className="secondary"
                         disabled={frozen}
                         onClick={() => {
                           setForm(formOf(record.draft));
@@ -656,7 +656,7 @@ export function Plans({
                       </button>
                     )}
                     <button
-                      className="retry"
+                      className="secondary"
                       disabled={busy || !!pending}
                       onClick={() => void work(() => detail(record.id))}
                     >
@@ -678,7 +678,7 @@ export function Plans({
                   <div className="section-heading">
                     <h3>RIWAYAT VERSI</h3>
                     <button
-                      className="retry"
+                      className="secondary"
                       disabled={busy || !!pending}
                       onClick={() => void work(() => loadHistory(record.id))}
                     >
@@ -723,7 +723,7 @@ export function Plans({
                   ))}
                   {history.nextCursor && (
                     <button
-                      className="retry"
+                      className="secondary"
                       disabled={busy || !!pending}
                       onClick={() =>
                         void work(() =>
