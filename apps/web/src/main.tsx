@@ -27,6 +27,7 @@ import "./styles.css";
 import { ApiError, auth, errorText, getBranch, getMe } from "./api";
 import type { Me } from "./contracts";
 import { Registrations } from "./registrations";
+import { Plans } from "./plans";
 
 type Role = Me["branchAccess"][number]["role"];
 const roles: Record<Role, string> = {
@@ -36,6 +37,13 @@ const roles: Record<Role, string> = {
   member: "Member",
 };
 const modules = [
+  {
+    id: "plans",
+    title: "Paket",
+    description: "Kelola draft, harga, dan riwayat versi paket.",
+    icon: Dumbbell,
+    roles: ["owner", "admin"],
+  },
   {
     id: "members",
     title: "Membership",
@@ -606,6 +614,14 @@ function Shell({
               onDirty={dirtyChanged}
               onBlock={blockChanged}
             />
+          ) : selected?.id === "plans" && operational ? (
+            <Plans
+              key={branchId}
+              branchId={branchId}
+              onSessionError={onSessionError}
+              onDirty={dirtyChanged}
+              onBlock={blockChanged}
+            />
           ) : selected ? (
             <Empty
               title={`${selected.title.toUpperCase()} SEGERA HADIR`}
@@ -661,7 +677,9 @@ function Shell({
                       <span>
                         {m.id === "members" && operational
                           ? "Buka registrasi"
-                          : "Segera hadir"}
+                          : m.id === "plans" && operational
+                            ? "Kelola paket"
+                            : "Segera hadir"}
                       </span>
                       <ArrowUpRight size={20} />
                     </div>

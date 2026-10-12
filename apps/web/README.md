@@ -51,3 +51,16 @@ Duplicate checks allow selecting a visible existing member or recording why a ca
 A failed/unknown mutation keeps its exact payload and idempotency key in component memory. Use Konfirmasi permintaan yang sama to reconcile. Navigation is blocked until the command outcome is known; the browser warns before reload/close. Nothing containing personal data is persisted in browser storage. Reloading/closing loses the in-memory retry context, so inspect the server registration list before starting another registration. Version conflicts require loading the latest detail before another decision.
 
 `tests/registrations.spec.ts` exercises failure and duplicate states with intercepted responses. `integration/auth.spec.ts` includes desktop and mobile-viewport browser flows against actual API/MySQL, with database assertions for one approved order and no rejected order. Run the real suite only through the disposable-database configuration in `.github/workflows/browser-integration.yml`. These tests are HTTP development checks, not deployed HTTPS or physical-device acceptance.
+
+## Package management demo
+
+Requires the registration FE and plan management backend (migration 0004). Sign in as an admin/owner with an explicit grant for the selected branch, then open **Paket**.
+
+1. Create a package, enter a name, price, currency, duration and optional benefits (one per line), then save the draft. Incomplete drafts can be saved but cannot be published.
+2. Review the saved draft and publish it. The confirmation shows the price/duration and explains that older versions remain available.
+3. Edit the price and save again. The previous publication stays selectable. Publish to create a second immutable version; compare both in **Riwayat versi**.
+4. Open Membership and create a registration with a published offer. Subsequent package edits/publications must not change that registration's price or order snapshot.
+
+Money is serialized as DECIMAL strings (for example `300000.00`), without floating-point conversion. Authoring revision numbers and published version numbers are separate. List and history support cursor pagination; the API does not provide search, retirement or deletion in this slice.
+
+On a stale version, review the latest server detail before editing again. Unknown write outcomes retain the exact request and idempotency key for **Konfirmasi hasil permintaan**, with navigation blocked while unresolved. Retry context is in memory; do not reload while a result is unknown. Session refresh preserves edits, and 401/403 clears private UI.
