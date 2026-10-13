@@ -1088,3 +1088,62 @@ small {
     flex: 1;
   }
 }
+
+/* Package authoring shares the registration workspace's responsive controls. */
+.plan-intro {
+  color: #a4a99c;
+  line-height: 1.6;
+  margin: 12px 0 24px;
+}
+.plan-fieldset {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+  margin: 20px 0 0;
+}
+.plan-field-error {
+  display: block;
+  color: #f3c2b9;
+  margin-top: 8px;
+}
+.plan-notice {
+  padding: 16px;
+  border-left: 3px solid var(--gold);
+  background: #27281e;
+  line-height: 1.6;
+}
+.plan-row {
+  width: 100%;
+}
+.plan-row small {
+  display: block;
+  margin-top: 8px;
+  color: #a4a99c;
+}
+.plan-history {
+  border-top: 1px solid var(--line);
+  padding: 20px 0;
+  overflow-wrap: anywhere;
+}
+.plans .section-heading {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.plans li {
+  margin: 8px 0;
+}
+.plans .reg-panel > p {
+  line-height: 1.6;
+  margin: 16px 0;
+}
+.plans label {
+  min-width: 0;
+}
+.plans .reg-panel .section-heading {
+  margin: 0 0 20px;
+}
+.plans h3,
+.plans h4,
+.plans li {
+  overflow-wrap: anywhere;
+}
