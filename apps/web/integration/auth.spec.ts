@@ -1,5 +1,9 @@
 import { test, expect, type Page } from "@playwright/test";
-import { createConnection, type Connection } from "mysql2/promise";
+import {
+  createConnection,
+  type Connection,
+  type RowDataPacket,
+} from "mysql2/promise";
 
 const api = "http://localhost:3000/api/v1";
 let db: Connection;
@@ -203,16 +207,60 @@ test("server-revoked session clears private UI on focus", async ({
 });
 
 for (const mobile of [false, true]) {
-  test(`registration UI clarify correction approve and reject (${mobile ? "mobile" : "desktop"})`, async ({
+  test(`UAT package publish member submit clarify correct approve and reject (${mobile ? "mobile" : "desktop"})`, async ({
     page,
     context,
   }) => {
     if (mobile) await page.setViewportSize({ width: 390, height: 844 });
     await login(page);
+    const layout = mobile ? "Mobile" : "Desktop";
+    const branchId = await page.getByLabel("Cabang aktif").inputValue();
+    page.on("dialog", (d) => d.accept());
+    async function orderRows(registrationId: string) {
+      const [rows] = await db.execute<RowDataPacket[]>(
+        "SELECT id FROM registration_order WHERE registration_id = ?",
+        [registrationId],
+      );
+      return rows;
+    }
+    if (mobile)
+      await page.getByRole("button", { name: "Buka navigasi" }).click();
+    await page.getByRole("button", { name: "Paket", exact: true }).click();
+    await page.getByRole("button", { name: "Buat paket", exact: true }).click();
+    await page.getByLabel("Nama paket", { exact: true }).fill(`UAT ${layout}`);
+    await page.getByLabel("Harga", { exact: true }).fill("325000.50");
+    await page.getByLabel("Durasi", { exact: true }).fill("1");
+    await page.getByLabel("Benefit (satu per baris)").fill("Akses gym UAT");
+    const draftResponse = page.waitForResponse(
+      (r) => r.url() === `${api}/plans` && r.request().method() === "POST",
+    );
+    await page
+      .getByRole("button", { name: "Simpan draft", exact: true })
+      .click();
+    const draft = await draftResponse;
+    expect(draft.status()).toBe(201);
+    const plan = (await draft.json()).data.plan;
+    expect(plan.status).toBe("draft");
+    const publicationResponse = page.waitForResponse(
+      (r) =>
+        r.url().includes(`/plans/${plan.id}/publish`) &&
+        r.request().method() === "POST",
+    );
+    await page
+      .getByRole("button", { name: "Publikasikan paket", exact: true })
+      .click();
+    const publication = await publicationResponse;
+    expect(publication.status()).toBe(200);
+    const offer = (await publication.json()).data.publishedVersion;
+    expect(offer.planId).toBe(plan.id);
+    expect(offer.branchId).toBe(branchId);
+    expect(offer.price.amount).toBe("325000.50");
+    await expect(
+      page.getByRole("region", { name: "Riwayat versi" }),
+    ).toContainText("IDR 325000.50");
     if (mobile)
       await page.getByRole("button", { name: "Buka navigasi" }).click();
     await page.getByRole("button", { name: "Membership", exact: true }).click();
-    page.on("dialog", (d) => d.accept());
     async function create(name: string, phone: string) {
       await page
         .getByRole("button", { name: "Registrasi baru", exact: true })
@@ -223,7 +271,7 @@ for (const mobile of [false, true]) {
         .getByLabel("Alamat domisili")
         .fill("Alamat sintetis untuk demo");
       await page.getByLabel("Tanggal lahir").fill("2000-02-29");
-      await page.getByLabel("Paket *").selectOption({ index: 1 });
+      await page.getByLabel("Paket *").selectOption(offer.id);
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth),
       ).toBeLessThanOrEqual(mobile ? 390 : 1280);
@@ -232,8 +280,15 @@ for (const mobile of [false, true]) {
         .click();
       await expect(page.locator(".reg-status")).toHaveText("Draft");
       const id = await page.locator(".reg-panel code").first().innerText();
+      expect(await orderRows(id)).toHaveLength(0);
+      const created = await context.request.get(`${api}/registrations/${id}`);
+      expect(created.ok()).toBe(true);
+      const saved = (await created.json()).data;
+      expect(saved.status).toBe("draft");
+      expect(saved.offer.id).toBe(offer.id);
       await page.getByRole("button", { name: "Kirim untuk review" }).click();
       await expect(page.locator(".reg-status")).toHaveText("Menunggu review");
+      expect(await orderRows(id)).toHaveLength(0);
       return id;
     }
     const id = await create(
@@ -245,6 +300,7 @@ for (const mobile of [false, true]) {
       .getByRole("button", { name: "Minta perbaikan", exact: true })
       .click();
     await expect(page.locator(".reg-status")).toHaveText("Perlu perbaikan");
+    expect(await orderRows(id)).toHaveLength(0);
     await page.getByRole("button", { name: "Perbaiki data" }).click();
     await page.getByLabel("Alamat domisili").fill("Alamat sintetis diperbaiki");
     await focusAndWait(page, 200);
@@ -252,18 +308,55 @@ for (const mobile of [false, true]) {
       "Alamat sintetis diperbaiki",
     );
     await page.getByRole("button", { name: "Simpan perbaikan" }).click();
+    await expect(
+      page.getByRole("button", { name: "Kirim untuk review" }),
+    ).toBeVisible();
+    const corrected = (
+      await (await context.request.get(`${api}/registrations/${id}`)).json()
+    ).data;
+    expect(corrected.id).toBe(id);
+    expect(corrected.identity.address).toBe("Alamat sintetis diperbaiki");
+    expect(await orderRows(id)).toHaveLength(0);
     await page.getByRole("button", { name: "Kirim untuk review" }).click();
     await expect(page.locator(".reg-status")).toHaveText("Menunggu review");
+    expect(await orderRows(id)).toHaveLength(0);
+    const approvalResponse = page.waitForResponse(
+      (r) =>
+        r.url() === `${api}/registrations/${id}/review` &&
+        r.request().method() === "POST",
+    );
     await page.getByRole("button", { name: "Setujui", exact: true }).click();
+    const approvedResponse = await approvalResponse;
+    expect(approvedResponse.status()).toBe(200);
+    const approved = (await approvedResponse.json()).data.registration;
+    expect(approved.id).toBe(id);
+    expect(approved.offer.id).toBe(offer.id);
+    expect(approved.offer.price.amount).toBe("325000.50");
+    expect(
+      approved.history.map((event: { decision: string }) => event.decision),
+    ).toEqual(["clarify", "approve"]);
     await expect(page.locator(".reg-status")).toHaveText("Disetujui");
     await expect(
       page.getByText("Membership belum aktif.", { exact: false }),
     ).toBeVisible();
-    const [orders] = await db.execute(
-      "SELECT id FROM registration_order WHERE registration_id = ?",
-      [id],
-    );
+    const orders = await orderRows(id);
     expect(orders).toHaveLength(1);
+    expect(orders[0].id).toBe(approved.orderId);
+    // Simulate a client retry after approval committed: the same command must
+    // return the original order, never create another one.
+    const originalRequest = approvedResponse.request();
+    const replay = await context.request.post(originalRequest.url(), {
+      headers: {
+        Origin: "http://localhost:5173",
+        "Idempotency-Key": originalRequest.headers()["idempotency-key"],
+      },
+      data: originalRequest.postDataJSON(),
+    });
+    expect(replay.status()).toBe(200);
+    const replayed = (await replay.json()).data;
+    expect(replayed.replayed).toBe(true);
+    expect(replayed.registration.orderId).toBe(approved.orderId);
+    expect(await orderRows(id)).toHaveLength(1);
     expect(
       (await (await context.request.get(`${api}/me`)).json()).data.entitlements,
     ).toEqual([]);
@@ -280,10 +373,30 @@ for (const mobile of [false, true]) {
     await expect(
       page.getByRole("button", { name: "Kirim untuk review" }),
     ).toHaveCount(0);
-    const [noOrders] = await db.execute(
-      "SELECT id FROM registration_order WHERE registration_id = ?",
-      [rejected],
+    const rejectedResponse = await context.request.get(
+      `${api}/registrations/${rejected}`,
     );
-    expect(noOrders).toHaveLength(0);
+    expect(rejectedResponse.ok()).toBe(true);
+    const rejectedRecord = (await rejectedResponse.json()).data;
+    expect(rejectedRecord.status).toBe("rejected");
+    expect(rejectedRecord.offer.id).toBe(offer.id);
+    expect(rejectedRecord.orderId).toBeUndefined();
+    expect(await orderRows(rejected)).toHaveLength(0);
+    console.log(
+      "UAT_EVIDENCE",
+      JSON.stringify({
+        viewport: layout.toLowerCase(),
+        planId: plan.id,
+        planVersionId: offer.id,
+        approvedRegistrationId: id,
+        orderId: approved.orderId,
+        approvedOrderCount: orders.length,
+        approvalReplayOrderCount: (await orderRows(id)).length,
+        rejectedRegistrationId: rejected,
+        rejectedOrderCount: (await orderRows(rejected)).length,
+        amount: approved.offer.price.amount,
+        membershipActivated: false,
+      }),
+    );
   });
 }
