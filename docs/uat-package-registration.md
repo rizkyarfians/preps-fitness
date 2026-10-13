@@ -17,7 +17,7 @@ The automated scenario in `apps/web/integration/auth.spec.ts` runs the full sequ
 | Replay approval | Same key and payload return `replayed: true`, same order ID; still exactly one database order |
 | Reject another member | Uses the same published offer; `rejected`, no order ID and zero database orders |
 
-The test logs a `UAT_EVIDENCE` JSON record for each viewport, containing synthetic plan/registration/order IDs and measured order counts. See the Real browser integration workflow run linked from the PR for execution evidence. Approval must not activate membership; current-user entitlements stay empty.
+The test logs a `UAT_EVIDENCE` JSON record for each viewport, containing synthetic plan/registration/order IDs and measured order counts. See the Real browser integration workflow run linked from the PR for execution evidence. Existing session and current-user entitlement regression checks also remain in the suite.
 
 Run using the existing `apps/web/playwright.integration.config.ts` and the environment in `.github/workflows/browser-integration.yml`. It requires `NODE_ENV=test`, `E2E_DISPOSABLE_DATABASE=yes` and the local `preps_e2e` database; do not point it at a live database. The workflow applies migrations and seeds disposable test accounts before running.
 

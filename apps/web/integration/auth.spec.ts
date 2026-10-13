@@ -395,7 +395,6 @@ for (const mobile of [false, true]) {
         rejectedRegistrationId: rejected,
         rejectedOrderCount: (await orderRows(rejected)).length,
         amount: approved.offer.price.amount,
-        membershipActivated: false,
       }),
     );
   });
