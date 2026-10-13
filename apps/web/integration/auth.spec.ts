@@ -203,7 +203,7 @@ test("server-revoked session clears private UI on focus", async ({
 });
 
 for (const mobile of [false, true]) {
-  test(`registration UI clarify correction approve and reject (${mobile ? "mobile" : "desktop"})`, async ({
+  test(`PM UAT package publish registration clarify approve and reject (${mobile ? "mobile" : "desktop"})`, async ({
     page,
     context,
   }) => {
@@ -211,8 +211,35 @@ for (const mobile of [false, true]) {
     await login(page);
     if (mobile)
       await page.getByRole("button", { name: "Buka navigasi" }).click();
-    await page.getByRole("button", { name: "Membership", exact: true }).click();
     page.on("dialog", (d) => d.accept());
+    await page.getByRole("button", { name: "Paket", exact: true }).click();
+    await page.getByRole("button", { name: "Buat paket", exact: true }).click();
+    const planName = `PM UAT ${mobile ? "Mobile" : "Desktop"}`;
+    await page.getByLabel("Nama paket", { exact: true }).fill(planName);
+    await page.getByLabel("Harga", { exact: true }).fill("275000.50");
+    await page.getByLabel("Durasi", { exact: true }).fill("1");
+    await page.getByLabel("Benefit (satu per baris)").fill("Gym access");
+    const saved = page.waitForResponse(
+      (r) => r.url() === `${api}/plans` && r.request().method() === "POST",
+    );
+    await page.getByRole("button", { name: "Simpan draft", exact: true }).click();
+    const savedResponse = await saved;
+    expect(savedResponse.ok()).toBe(true);
+    const plan = (await savedResponse.json()).data.plan;
+    expect(plan.status).toBe("draft");
+    const published = page.waitForResponse(
+      (r) => r.url().includes(`/plans/${plan.id}/publish`) && r.request().method() === "POST",
+    );
+    await page.getByRole("button", { name: "Publikasikan paket", exact: true }).click();
+    const publishedResponse = await published;
+    expect(publishedResponse.ok()).toBe(true);
+    const publication = (await publishedResponse.json()).data;
+    expect(publication.plan.status).toBe("published");
+    const offer = publication.publishedVersion;
+    await expect(page.getByRole("region", { name: "Riwayat versi" })).toContainText("IDR 275000.50");
+    if (mobile)
+      await page.getByRole("button", { name: "Buka navigasi" }).click();
+    await page.getByRole("button", { name: "Membership", exact: true }).click();
     async function create(name: string, phone: string) {
       await page
         .getByRole("button", { name: "Registrasi baru", exact: true })
@@ -223,7 +250,7 @@ for (const mobile of [false, true]) {
         .getByLabel("Alamat domisili")
         .fill("Alamat sintetis untuk demo");
       await page.getByLabel("Tanggal lahir").fill("2000-02-29");
-      await page.getByLabel("Paket *").selectOption({ index: 1 });
+      await page.getByLabel("Paket *").selectOption(offer.id);
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth),
       ).toBeLessThanOrEqual(mobile ? 390 : 1280);
@@ -254,7 +281,26 @@ for (const mobile of [false, true]) {
     await page.getByRole("button", { name: "Simpan perbaikan" }).click();
     await page.getByRole("button", { name: "Kirim untuk review" }).click();
     await expect(page.locator(".reg-status")).toHaveText("Menunggu review");
+    const approvedResponse = page.waitForResponse(
+      (r) => r.url() === `${api}/registrations/${id}/review` && r.request().method() === "POST",
+    );
     await page.getByRole("button", { name: "Setujui", exact: true }).click();
+    const approval = await approvedResponse;
+    expect(approval.ok()).toBe(true);
+    const approved = (await approval.json()).data.registration;
+    expect(approved.identity.address).toBe("Alamat sintetis diperbaiki");
+    expect(approved.offer.id).toBe(offer.id);
+    expect(approved.offer.price.amount).toBe("275000.50");
+    // A lost response must be safe to retry with the original command key/body.
+    const retry = await context.request.post(approval.url(), {
+      headers: {
+        Origin: "http://localhost:5173",
+        "Idempotency-Key": approval.request().headers()["idempotency-key"],
+      },
+      data: approval.request().postDataJSON(),
+    });
+    expect(retry.ok(), await retry.text()).toBe(true);
+    expect((await retry.json()).data.registration.orderId).toBe(approved.orderId);
     await expect(page.locator(".reg-status")).toHaveText("Disetujui");
     await expect(
       page.getByText("Membership belum aktif.", { exact: false }),
@@ -263,7 +309,7 @@ for (const mobile of [false, true]) {
       "SELECT id FROM registration_order WHERE registration_id = ?",
       [id],
     );
-    expect(orders).toHaveLength(1);
+    expect(orders).toEqual([{ id: approved.orderId }]);
     expect(
       (await (await context.request.get(`${api}/me`)).json()).data.entitlements,
     ).toEqual([]);
