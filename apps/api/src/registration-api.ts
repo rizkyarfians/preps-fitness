@@ -6,7 +6,7 @@ import { z } from 'zod';
 import type { Database } from './db/client.js';
 import type { Config } from './config.js';
 import type { Principal } from './access.js';
-import { createCommandRunner, CommandError, canonicalJson, type Transaction, type JsonValue } from './commands.js';
+import { createCommandRunner, resolveCommand, CommandError, canonicalJson, type Transaction, type JsonValue } from './commands.js';
 import { member, memberBranch, branchAccess, plan, planVersion, registration, registrationOrder, candidateCheck } from './db/schema.js';
 import { identifier, identitySchema, createSchema, editSchema, submitSchema, reviewSchema, todayIn, completeIdentity, validateIdentity, actions, RegistrationError, type Identity, type Resolution, type Offer } from './registration-validation.js';
 type Executor = Database | Transaction;
@@ -105,6 +105,22 @@ export function registrationRouter(db:Database, config:Config) {
   if(!['GET','HEAD'].includes(req.method) && req.get('origin')!==config.WEB_ORIGIN) { next(new RegistrationError(403,'ACTION_NOT_ALLOWED'));return; }
   next();
  });
+ // Lookup is scoped to the authenticated actor; caller-supplied actor/gym IDs are forbidden.
+ // POST keeps recovery keys out of query strings and uses the normal Origin check.
+ router.post('/commands/resolve',asyncRoute(async(req,res)=>{
+  const body=parse(z.object({branchId:identifier,
+   operation:z.enum(['plan.create','plan.edit','plan.publish','plan-version.deactivate','registration.create','registration.edit','registration.submit','registration.review']),
+   idempotencyKey:z.string().min(1).max(128).regex(/^[a-zA-Z0-9._:-]+$/),
+  }).strict(),req.body);
+  const actor=principal(res).user.id;
+  const receipt=await resolveCommand(db,config.GYM_ID,{...body,actorId:actor},tx=>authorize(tx,actor,body.branchId));
+  if(!receipt) {res.json({data:{status:'unknown'}});return;}
+  const ids=receipt.result as {id:string;publishedVersionId?:string};
+  res.json({data:{status:'completed',commandId:receipt.commandId,operation:body.operation,result:{
+   resourceType:body.operation.startsWith('registration.')?'registration':'plan',resourceId:ids.id,
+   ...(ids.publishedVersionId?{planVersionId:ids.publishedVersionId}:{}),
+  }}});
+ }));
  // Plan authoring uses the same branch authorization, cursor and command guarantees.
  const planView = (p:typeof plan.$inferSelect) => ({id:p.id,branchId:p.branchId,draft:p.draft,status:p.status,version:p.version,
   ...(p.latestVersionId?{latestVersionId:p.latestVersionId}:{}),createdAt:p.createdAt.toISOString(),updatedAt:p.updatedAt.toISOString(),
@@ -172,6 +188,21 @@ export function registrationRouter(db:Database, config:Config) {
  }
  router.patch('/plans/:id',asyncRoute((req,res)=>mutatePlan(req,res,false)));
  router.post('/plans/:id/publish',asyncRoute((req,res)=>mutatePlan(req,res,true)));
+ router.post('/plan-versions/:id/deactivate',asyncRoute(async(req,res)=>{
+  const actor=principal(res).user.id,branchId=parse(identifier,req.query.branchId),id=parse(identifier,req.params.id);
+  parse(z.object({}).strict(),req.body);
+  const key=parse(z.string().min(1).max(128).regex(/^[a-zA-Z0-9._:-]+$/),req.get('Idempotency-Key'));
+  const result=await run({actorId:actor,branchId,operation:'plan-version.deactivate',idempotencyKey:key,payload:{id}},{
+   serializeGym:true,authorize:tx=>authorize(tx,actor,branchId),execute:async tx=>{
+    const [p]=await tx.select().from(planVersion).where(and(eq(planVersion.gymId,config.GYM_ID),eq(planVersion.branchId,branchId),eq(planVersion.id,id)));
+    if(!p)throw new RegistrationError(404,'NOT_FOUND');
+    if(!p.selectable)throw new RegistrationError(409,'PLAN_ALREADY_INACTIVE');
+    await tx.update(planVersion).set({selectable:false}).where(eq(planVersion.id,id));
+    return {result:{id:p.planId,publishedVersionId:id},resourceId:id,events:['plan-version.deactivate']};
+   },
+  });
+  res.json({data:{commandId:result.commandId,replayed:result.replayed,planVersionId:id,selectable:false}});
+ }));
  router.get('/registration-context',asyncRoute(async(req,res)=>{
   const branchId=parse(identifier,req.query.branchId);await authorize(db,principal(res).user.id,branchId);
   res.json({data:{gymId:config.GYM_ID,branchId,timezone:config.GYM_TIMEZONE,today:todayIn(config.GYM_TIMEZONE),asOf:new Date().toISOString(),allowedActions:['create']}});

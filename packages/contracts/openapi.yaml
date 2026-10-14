@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Preps Fitness business API",
-    "version": "0.4.0",
+    "version": "0.5.0",
     "description": "Business API with admin registration and review. Approval creates an order without membership activation. Better Auth uses its native contract."
   },
   "servers": [
@@ -2847,6 +2847,314 @@
           }
         }
       }
+    },
+    "/plan-versions/{planVersionId}/deactivate": {
+      "post": {
+        "operationId": "deactivatePlanVersion",
+        "x-implementation-status": "implemented",
+        "description": "Owner/admin in the branch can irreversibly mark one published version unselectable. Empty JSON object required. No snapshot, order, draft or authoring version is rewritten. Existing pending reviews can approve their saved snapshot; draft/clarification submissions must choose an available offer. Same key replays; another key on inactive version returns 409 PLAN_ALREADY_INACTIVE. Audited atomically; no membership activation. Matching Origin and Idempotency-Key required.",
+        "parameters": [
+          {
+            "name": "planVersionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36
+            }
+          },
+          {
+            "name": "branchId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 36
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[a-zA-Z0-9._:-]+$"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Malformed JSON or idempotency key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Account, branch or action denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not visible or absent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: version, transition, duplicate or command",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Field validation or incomplete profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationError"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "description": "Seconds before retry"
+              }
+            }
+          },
+          "503": {
+            "description": "Transient service failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "JSON body exceeds 64 KB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/DeactivatePlanVersionResult"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeactivatePlanVersion"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/commands/resolve": {
+      "post": {
+        "operationId": "resolveCommand",
+        "x-implementation-status": "implemented",
+        "description": "Read a durable command result scoped to deployment gym, authenticated actor, branch, operation and original Idempotency-Key (in body). Owner/admin grant and matching Origin required; no new Idempotency-Key header. Persist this metadata BEFORE sending the mutation. Completed returns original resource references, not historical personal data or current resource state: fetch detail/history separately. Unknown means no completed receipt was observed, NOT failure, cancellation or permission to send with a new key. A delayed request may still execute. No receipt expiry is currently configured. Cross-actor lookup returns unknown; revoked permissions return 403. No-store.",
+        "parameters": [],
+        "responses": {
+          "400": {
+            "description": "Malformed JSON or idempotency key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Account, branch or action denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not visible or absent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: version, transition, duplicate or command",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Field validation or incomplete profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationError"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "description": "Seconds before retry"
+              }
+            }
+          },
+          "503": {
+            "description": "Transient service failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "JSON body exceeds 64 KB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/CommandRecoveryResult"
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveCommand"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4146,6 +4454,160 @@
           "plan"
         ],
         "description": "Current authorized plan state; publish responses also return the original immutable publishedVersion even on replay after later publications."
+      },
+      "ResolveCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "branchId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 36
+          },
+          "operation": {
+            "type": "string",
+            "enum": [
+              "plan.create",
+              "plan.edit",
+              "plan.publish",
+              "plan-version.deactivate",
+              "registration.create",
+              "registration.edit",
+              "registration.submit",
+              "registration.review"
+            ]
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[a-zA-Z0-9._:-]+$"
+          }
+        },
+        "required": [
+          "branchId",
+          "operation",
+          "idempotencyKey"
+        ]
+      },
+      "CommandRecoveryResult": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "unknown"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "completed"
+                ]
+              },
+              "commandId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 36
+              },
+              "operation": {
+                "type": "string",
+                "enum": [
+                  "plan.create",
+                  "plan.edit",
+                  "plan.publish",
+                  "plan-version.deactivate",
+                  "registration.create",
+                  "registration.edit",
+                  "registration.submit",
+                  "registration.review"
+                ]
+              },
+              "result": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "resourceType": {
+                    "type": "string",
+                    "enum": [
+                      "plan",
+                      "registration"
+                    ]
+                  },
+                  "resourceId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 36
+                  },
+                  "planVersionId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 36
+                  }
+                },
+                "required": [
+                  "resourceType",
+                  "resourceId"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "commandId",
+              "operation",
+              "result"
+            ]
+          }
+        ]
+      },
+      "DeactivatePlanVersion": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {},
+        "required": []
+      },
+      "DeactivatePlanVersionResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "commandId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 36
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "planVersionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 36
+          },
+          "selectable": {
+            "type": "boolean",
+            "enum": [
+              false
+            ]
+          }
+        },
+        "required": [
+          "commandId",
+          "replayed",
+          "planVersionId",
+          "selectable"
+        ]
       }
     }
   }

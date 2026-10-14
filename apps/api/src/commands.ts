@@ -73,3 +73,23 @@ export function createCommandRunner(db: Database, deploymentGym: string) {
   }, { isolationLevel: 'read committed' });
  };
 }
+
+/** Read a durable receipt without replaying the write or requiring its personal-data payload.
+ * The gym lock fences already-running serialized commands, but an absent receipt is NOT
+ * proof that a delayed request cannot arrive later. Never authorize a new key on absence.
+ */
+export async function resolveCommand(db: Database, deploymentGym: string, request: Omit<CommandRequest, 'payload'>,
+ authorize: (tx: Transaction) => Promise<void>) {
+ const input = inputSchema.parse(request);
+ const scopeHash = digest([deploymentGym, input.actorId, input.branchId, input.operation, input.idempotencyKey]);
+ return db.transaction(async tx => {
+  await tx.select({id:gym.id}).from(gym).where(eq(gym.id,deploymentGym)).for('update');
+  const [account] = await tx.select().from(gymUser).where(and(eq(gymUser.gymId,deploymentGym),eq(gymUser.userId,input.actorId))).for('update');
+  if (!account?.enabled) throw new CommandError('COMMAND_ACCESS_DENIED');
+  const grants = await tx.select().from(branchAccess).where(and(eq(branchAccess.gymId,deploymentGym),eq(branchAccess.userId,input.actorId),eq(branchAccess.branchId,input.branchId))).for('update');
+  if (!grants.length) throw new CommandError('COMMAND_ACCESS_DENIED');
+  await authorize(tx);
+  const [receipt] = await tx.select().from(commandReceipt).where(eq(commandReceipt.scopeHash,scopeHash));
+  return receipt?.status === 'completed' ? { commandId:receipt.commandId, result:receipt.result } : null;
+ }, { isolationLevel:'read committed' });
+}
