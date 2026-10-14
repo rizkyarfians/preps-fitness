@@ -37,7 +37,7 @@ Create returns 201 (`data.plan`, commandId, replayed); replay returns 200. To pu
 
 Authoring `plan.version` is an optimistic concurrency counter, separate from `publishedVersion.version`. Every edit and publish increments the authoring counter. PATCH sends `{version, draft}` and replaces the entire draft (omitted fields are removed). Editing a published plan changes status to draft while the last published offer remains available. Publishing a published state without another edit returns INVALID_TRANSITION.
 
-Each publish creates a new immutable ID and monotonically increasing published version for that gym/branch/plan. Previous versions remain selectable; this slice deliberately does not infer automatic retirement, expiry or price replacement. The management history includes the selectable flag. Registration detail and order prices remain frozen. A future explicit retirement operation can control availability; pending registrations must retain their snapshots.
+Each publish creates a new immutable ID and monotonically increasing published version for that gym/branch/plan. Previous versions remain selectable; this slice deliberately does not infer automatic retirement, expiry or price replacement. The management history includes the selectable flag. Registration detail and order prices remain frozen. The explicit deactivation endpoint controls availability; pending registrations retain their snapshots.
 
 ## Retry and errors
 
@@ -45,4 +45,7 @@ All writes require Idempotency-Key and Origin. Edit/publish require current vers
 
 STALE_VERSION includes currentVersion (409); refetch and let the user review changes before a new command. Invalid/incomplete draft values return VALIDATION_FAILED with fieldErrors (422). Invalid transition is 409. Missing permission is 403, absent plan is 404; authentication, Origin, size and service errors use the existing RegistrationError envelope. Publish and audit/outbox/receipt commit atomically; failed publish leaves no new version. Publish is serialized with registration mutations through the existing gym lock, including across admins.
 
-No plan management FE UI, payment recording, activation, deletion, retirement or account provisioning is added here.
+Payment recording, activation, deletion and account provisioning remain outside this contract. Deactivation and command recovery are documented below.
+
+Explicit deactivation is now available through `POST /plan-versions/:id/deactivate`.
+See [deactivation and reload recovery](command-recovery-and-plan-retirement.md) for the FE contract, existing-registration policy and error handling.

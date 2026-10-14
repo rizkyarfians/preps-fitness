@@ -58,6 +58,77 @@ export async function planScenarios(t:TestContext,db:Database,config:Config) {
   await b.get('/api/v1/plans').query({branchId:'branch-a',cursor:page.nextCursor}).expect(422);
   await a.get('/api/v1/plans').query({branchId:'branch-a',cursor:page.nextCursor}).expect(200);
  });
+ await t.test('deactivation preserves submitted snapshots; durable recovery is actor scoped and safe after restart',async()=>{
+  const recover=(operation:string,key:string,agent=a,branchId='branch-a')=>agent.post('/api/v1/commands/resolve').set('Origin',config.WEB_ORIGIN).send({branchId,operation,idempotencyKey:key});
+  const make=(suffix:string)=>write('post','/plans',{branchId:'branch-a',draft:content},`recover-create-${suffix}`);
+  const created=(await make('one').expect(201)).body.data;
+  const p=created.plan;
+  const pub=(await write('post',`/plans/${p.id}/publish?branchId=branch-a`,{version:p.version},'recover-publish').expect(200)).body.data;
+  const offer=pub.publishedVersion;
+  // A fresh application instance proves recovery does not depend on process memory.
+  const fresh=request(app(actor));
+  const recovered=(await recover('plan.create','recover-create-one',fresh).expect(200)).body.data;
+  assert.deepEqual(recovered,{status:'completed',commandId:created.commandId,operation:'plan.create',result:{resourceType:'plan',resourceId:p.id}});
+  assert.equal((await recover('plan.publish','recover-publish',fresh).expect(200)).body.data.result.planVersionId,offer.id);
+  assert.deepEqual((await recover('plan.create','recover-create-one',b).expect(200)).body.data,{status:'unknown'});
+  assert.deepEqual((await recover('plan.edit','recover-create-one').expect(200)).body.data,{status:'unknown'});
+  await recover('plan.create','recover-create-one',a,'branch-b').expect(403);
+  await recover('plan.create','recover-create-one',m).expect(403);
+  await a.post('/api/v1/commands/resolve').send({branchId:'branch-a',operation:'plan.create',idempotencyKey:'recover-create-one'}).expect(403);
+  await a.post('/api/v1/commands/resolve').set('Origin',config.WEB_ORIGIN).send({branchId:'branch-a',operation:'plan.create',idempotencyKey:'recover-create-one',actorId:other}).expect(422);
+  const identity={fullName:'Recovery test member',phone:'+62819999123457',address:'Original address',birthDate:'2000-01-01'};
+  const createReg=(name:string,phone:string,key:string)=>write('post','/registrations',{branchId:'branch-a',planVersionId:offer.id,identity:{...identity,fullName:name,phone}},key);
+  let pending=(await createReg(identity.fullName,identity.phone,'recover-registration').expect(201)).body.data.registration;
+  const draft=(await createReg('Retired draft','+62819999123458','retired-draft').expect(201)).body.data.registration;
+  pending=(await write('patch',`/registrations/${pending.id}`,{version:pending.version,planVersionId:offer.id,identity:{...identity,address:'Corrected address'}},'recover-edit').expect(200)).body.data.registration;
+  pending=(await write('post',`/registrations/${pending.id}/submit`,{version:pending.version},'recover-submit').expect(200)).body.data.registration;
+  const retirePath=`/plan-versions/${offer.id}/deactivate?branchId=branch-a`;
+  await write('post',retirePath,{},'denied-retire',m).expect(403);
+  await write('post',retirePath,{selectable:true}).expect(422);
+  await write('post',`/plan-versions/${offer.id}/deactivate?branchId=branch-b`,{}).expect(403);
+  await write('post','/plan-versions/absent/deactivate?branchId=branch-a',{}).expect(404);
+  const race=await Promise.all([write('post',retirePath,{},'retire-once'),write('post',retirePath,{},'retire-once')]);
+  assert.ok(race.every(r=>r.status===200));assert.equal(new Set(race.map(r=>r.body.data.commandId)).size,1);
+  assert.equal(race.filter(r=>!r.body.data.replayed).length,1);
+  assert.equal((await write('post',retirePath,{},'another-retire').expect(409)).body.error.reasonCode,'PLAN_ALREADY_INACTIVE');
+  await write('post',`/plan-versions/${draft.id}/deactivate?branchId=branch-a`,{},'retire-once').expect(409);
+  const history=(await a.get(`/api/v1/plans/${p.id}/versions?branchId=branch-a`).expect(200)).body.data.items;
+  assert.deepEqual(history,[{offer,selectable:false}]);
+  assert.ok(!(await a.get('/api/v1/plan-versions?branchId=branch-a').expect(200)).body.data.items.some((v:{id:string})=>v.id===offer.id));
+  await a.get(`/api/v1/plan-versions/${offer.id}?branchId=branch-a`).expect(409);
+  await createReg('Unavailable offer','+62819999123459','unavailable-create').expect(409);
+  await write('post',`/registrations/${draft.id}/submit`,{version:draft.version},'unavailable-submit').expect(409);
+  await write('patch',`/registrations/${draft.id}`,{version:draft.version,planVersionId:offer.id}).expect(409);
+  // Existing pending review retains the commercial snapshot and can still be approved.
+  const reviewBody={version:pending.version,decision:'approve'};
+  const approved=(await write('post',`/registrations/${pending.id}/review`,reviewBody,'recover-approve').expect(200)).body.data;
+  await write('post',`/registrations/${pending.id}/review`,reviewBody,'recover-approve').expect(200);
+  for(const [operation,key] of [['registration.create','recover-registration'],['registration.edit','recover-edit'],['registration.submit','recover-submit'],['registration.review','recover-approve']]) {
+   const r=(await recover(operation!,key!,fresh).expect(200)).body.data;
+   assert.equal(r.status,'completed');assert.deepEqual(r.result,{resourceType:'registration',resourceId:pending.id});
+   assert.ok(!JSON.stringify(r).includes(identity.phone));
+  }
+  const [order]=await db.select().from(registrationOrder).where(eq(registrationOrder.registrationId,pending.id));
+  assert.equal(order!.id,approved.registration.orderId);assert.deepEqual(order!.offer,offer);
+  assert.equal((await db.select().from(registrationOrder).where(eq(registrationOrder.registrationId,pending.id))).length,1);
+  const retired=(await recover('plan-version.deactivate','retire-once',fresh).expect(200)).body.data;
+  assert.deepEqual(retired.result,{resourceType:'plan',resourceId:p.id,planVersionId:offer.id});
+  const audits=await db.select().from(auditEvent).where(eq(auditEvent.commandId,retired.commandId));assert.equal(audits.length,1);
+  assert.equal((await db.select().from(outboxEvent).where(eq(outboxEvent.commandId,retired.commandId))).length,1);
+  // Absence is explicitly unknown: a delayed write can still complete afterward.
+  assert.deepEqual((await recover('plan.create','recover-create-late').expect(200)).body.data,{status:'unknown'});
+  await make('late').expect(201);
+  assert.equal((await recover('plan.create','recover-create-late').expect(200)).body.data.status,'completed');
+  assert.deepEqual((await recover('registration.create','unavailable-create').expect(200)).body.data,{status:'unknown'});
+  await db.update(gymUser).set({enabled:false}).where(and(eq(gymUser.gymId,config.GYM_ID),eq(gymUser.userId,actor)));
+  try {await recover('plan.create','recover-create-one',fresh).expect(403);} finally {
+   await db.update(gymUser).set({enabled:true}).where(and(eq(gymUser.gymId,config.GYM_ID),eq(gymUser.userId,actor)));
+  }
+  await db.update(branchAccess).set({role:'member'}).where(and(eq(branchAccess.gymId,config.GYM_ID),eq(branchAccess.userId,actor)));
+  try {await recover('plan.create','recover-create-one',fresh).expect(403);} finally {
+   await db.update(branchAccess).set({role:'admin'}).where(and(eq(branchAccess.gymId,config.GYM_ID),eq(branchAccess.userId,actor)));
+  }
+ });
  await t.test('publish retries and two-admin race produce exactly one immutable version with audit/outbox',async()=>{
   const body={branchId:'branch-a',draft:content};
   const created=await Promise.all(Array.from({length:4},()=>write('post','/plans',body,'create-plan-once')));

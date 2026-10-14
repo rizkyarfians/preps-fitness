@@ -34,3 +34,7 @@ export type ManagedPlanPage = { "items": Array<ManagedPlan>; "nextCursor"?: stri
 export type PlanPublication = { "offer": PlanVersion; "selectable": boolean };
 export type PlanPublicationPage = { "items": Array<PlanPublication>; "nextCursor"?: string };
 export type PlanCommandResult = { "commandId": string; "replayed": boolean; "plan": ManagedPlan; "publishedVersion"?: PlanVersion };
+export type ResolveCommand = { "branchId": string; "operation": "plan.create" | "plan.edit" | "plan.publish" | "plan-version.deactivate" | "registration.create" | "registration.edit" | "registration.submit" | "registration.review"; "idempotencyKey": string };
+export type CommandRecoveryResult = ({ "status": "unknown" }) | ({ "status": "completed"; "commandId": string; "operation": "plan.create" | "plan.edit" | "plan.publish" | "plan-version.deactivate" | "registration.create" | "registration.edit" | "registration.submit" | "registration.review"; "result": { "resourceType": "plan" | "registration"; "resourceId": string; "planVersionId"?: string } });
+export type DeactivatePlanVersion = {  };
+export type DeactivatePlanVersionResult = { "commandId": string; "replayed": boolean; "planVersionId": string; "selectable": false };
